@@ -1,0 +1,17 @@
+# CUE backend. Everything here is already present on the demo machine.
+# Note there is no torch/transformers: clustering runs on scikit-learn over a
+# structured intent space, which is faster, deterministic, and needs no model
+# download. See app/vectors.py for why.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+numpy>=1.24
+scikit-learn>=1.3
+
+# Optional -- the LLM enhancement layer. The system is fully functional without
+# either of these and without any API key.
+openai>=1.0 ; python_version >= "3.8"
+httpx>=0.24
+
+# Dev
+pytest>=7.0

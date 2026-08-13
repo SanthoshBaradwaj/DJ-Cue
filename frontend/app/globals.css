@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/*
+  CUE design system.
+
+  Two surfaces, one language:
+  - Guest (mobile, in a dark venue, one hand, 10 seconds) — warm, inviting,
+    generous touch targets, nothing to read.
+  - DJ (tablet at arm's length in a dark booth, glanced at between mixes) —
+    near-black, high contrast, big numerals, colour used only to rank.
+
+  Everything is dark. A white flash from a phone at a wedding is rude, and a
+  white dashboard in a booth is unusable.
+*/
+
+@theme {
+  /* Near-black with a faint warm cast rather than blue-black — it stops the
+     amber ramp below from reading as "orange on navy", which is the single
+     most generic dark-UI combination there is. */
+  --color-ink: #0a0a0b;
+  --color-ink-raised: #131314;
+  --color-ink-card: #191919;
+  --color-ink-line: #292927;
+
+  --color-mist: #96968e;
+  --color-chalk: #f4f3ee;
+
+  /* Wave heat — ONE hue, descending intensity.
+     The previous ramp was pink/purple/blue/cyan: four saturated hues with no
+     ordering. Hue carries no magnitude, so nothing about #a855f7 said "second"
+     — the DJ had to read the numbers to know which wave was biggest, which is
+     the one thing colour should have been doing for him.
+     Ember -> sand -> ash is monotonic, so rank is legible peripherally, and it
+     leaves cool tones free to mean something else entirely (see --color-go). */
+  --color-cue-1: #ff6b35;
+  --color-cue-2: #f79246;
+  --color-cue-3: #dcb463;
+  --color-cue-4: #9a9583;
+  --color-cue-5: #61605c;
+
+  /* State, not rank. Deliberately the only cool colour in the system, so
+     "this is live" can never be confused with "this wave is hot". */
+  --color-go: #3ddc97;
+  --color-hold: #dcb463;
+  --color-drop: #61605c;
+
+  /* Money is its own signal — never reuse a wave colour for it. */
+  --color-tip: #d8c9a3;
+
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-rise: rise 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in: slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 2.2s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.15; transform: scale(1.06); }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -300% 0; }
+  100% { background-position: 300% 0; }
+}
+
+html, body {
+  background: var(--color-ink);
+  color: var(--color-chalk);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+body {
+  /* Slow-breathing club glow. Fixed so it never scrolls away. */
+  background-image:
+    radial-gradient(900px 500px at 12% -8%, rgba(255, 45, 120, 0.14), transparent 62%),
+    radial-gradient(760px 460px at 88% 4%, rgba(168, 85, 247, 0.13), transparent 60%),
+    radial-gradient(600px 420px at 50% 108%, rgba(56, 189, 248, 0.09), transparent 60%);
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+
+/* Tabular numerals everywhere a count is shown — digits must not jitter as
+   request counts tick up live on stage. */
+.tnum { font-variant-numeric: tabular-nums; }
+
+.card {
+  background: color-mix(in oklab, var(--color-ink-card) 88%, transparent);
+  border: 1px solid var(--color-ink-line);
+  border-radius: 1rem;
+  backdrop-filter: blur(12px);
+}
+
+.hairline { border-color: var(--color-ink-line); }
+
+/* Comfortable thumb targets on a phone in a dark, moving crowd. */
+.tap { min-height: 48px; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-line);
+  border-radius: 99px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
