@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { RequestAck } from "@/lib/types";
 import CountUp from "./CountUp";
+import TipBoost from "./TipBoost";
 import { intentChips } from "./intent";
 import type { GuestHistoryEntry } from "./useGuestHistory";
 
@@ -174,6 +175,8 @@ export default function Confirmation({
           </ul>
         ) : null}
       </div>
+
+      <TipBoost waveId={ack.wave_id ?? null} />
 
       <button
         type="button"

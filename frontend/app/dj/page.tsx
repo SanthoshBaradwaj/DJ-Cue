@@ -112,6 +112,8 @@ export default function DJDashboardPage() {
     .join(",");
   const waveSignature = waves.map((v) => v.wave.id).join(",");
 
+  const [rawTips, setRawTips] = useState<{ track_id: string; amount_minor: number; state: string }[]>([]);
+
   const refreshProposals = useCallback(() => {
     if (mode !== "live") return;
     api
@@ -123,6 +125,14 @@ export default function DJDashboardPage() {
       .catch(() => {
         // A failed proposal fetch must not disturb the board the DJ is reading.
       });
+
+    api
+      .tips(EVENT_ID)
+      .then((r) => {
+        setRawTips(r.tips ?? []);
+        if (r.totals) setTipTotals(r.totals);
+      })
+      .catch(() => undefined);
   }, [mode]);
 
   useEffect(refreshProposals, [refreshProposals, setlistSignature, waveSignature]);
@@ -185,6 +195,23 @@ export default function DJDashboardPage() {
   const listRef = useRef<HTMLDivElement>(null);
   useFlipReorder(listRef, waves.map((v) => v.wave.id).join("|"));
 
+  // Track-level tip amounts derived from all live tips + proposals so the DJ
+  // sees money behind a candidate even before setlist insertion.
+  const trackTipMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of rawTips) {
+      if (t.state === "pending" || t.state === "captured") {
+        map.set(t.track_id, (map.get(t.track_id) ?? 0) + t.amount_minor);
+      }
+    }
+    for (const p of proposals) {
+      if (p.tip_minor > 0 && !map.has(p.track.id)) {
+        map.set(p.track.id, p.tip_minor);
+      }
+    }
+    return map;
+  }, [rawTips, proposals]);
+
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-ink text-chalk">
       {state && (
@@ -192,6 +219,7 @@ export default function DJDashboardPage() {
           eventName={mode === "live" ? "Live event" : "Mock event"}
           stats={state.stats}
           status={status}
+          tipTotals={tipTotals}
         />
       )}
 
@@ -220,6 +248,7 @@ export default function DJDashboardPage() {
                     decisions={decisions}
                     retired={retired}
                     onDecide={onDecide}
+                    trackTipMap={trackTipMap}
                   />
                 </div>
               ))}

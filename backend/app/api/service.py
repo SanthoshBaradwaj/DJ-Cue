@@ -9,6 +9,7 @@ verifier can drive the exact same code path the API does.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from typing import Dict, List, Optional, Set, Tuple
@@ -67,6 +68,28 @@ def _is_confident_match(query: str, track: Track) -> bool:
     return track.title.lower() in query.lower() or query.lower() in track.title.lower()
 
 
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_SETLIST_PATH = os.path.join(_ROOT, "data", "setlist.txt")
+_LINE_RE = re.compile(r"^\s*(\d{1,2}:\d{2}:\d{2})\s+(.+?)\s*$")
+
+
+def _load_default_setlist_entries() -> List[Dict[str, str]]:
+    if not os.path.exists(_SETLIST_PATH):
+        return []
+    entries = []
+    try:
+        with open(_SETLIST_PATH, encoding="utf-8") as f:
+            for line in f:
+                if not line.strip() or line.lstrip().startswith("#"):
+                    continue
+                m = _LINE_RE.match(line)
+                if m:
+                    entries.append({"cue_time": m.group(1), "title": m.group(2)})
+    except Exception:
+        pass
+    return entries
+
+
 class CueService:
     def __init__(self) -> None:
         self.store = get_store()
@@ -79,6 +102,16 @@ class CueService:
         # Tips, per event. Deliberately alongside _skipped rather than in the
         # store: same lifetime as an event, and it keeps store.py untouched.
         self._tips: Dict[str, List[Tip]] = {}
+        # Auto-seed the default setlist if available
+        self.auto_seed_setlist(settings.default_event_id)
+
+    def auto_seed_setlist(self, event_id: str) -> None:
+        """Seed the DJ's planned set from data/setlist.txt if no setlist is loaded."""
+        dj = self.store.dj_state(event_id)
+        if not dj.setlist:
+            entries = _load_default_setlist_entries()
+            if entries:
+                self.load_setlist(event_id, entries)
 
     # -- reads --------------------------------------------------------------
 
@@ -139,6 +172,7 @@ class CueService:
         return out
 
     def build_dashboard(self, event_id: str) -> DashboardState:
+        self.auto_seed_setlist(event_id)
         waves: List[Wave] = self.engine.waves(event_id)
         dj: DJState = self.store.dj_state(event_id)
         exclude = set(self.skipped(event_id))
@@ -171,6 +205,13 @@ class CueService:
         started = time.perf_counter()
         intent = await interpret_async(text)
         self.store.record_interpret_ms(event_id, (time.perf_counter() - started) * 1000)
+
+        # If this request names a specific song missing from the catalog, resolve and add it
+        try:
+            from ..interpreter.discovery import discover_and_add_track
+            await discover_and_add_track(text, intent, self.catalog)
+        except Exception as exc:
+            log.warning("dynamic track discovery failed: %s", exc)
 
         request, wave, joined = self.engine.ingest(event_id, session_id, text, intent)
 
@@ -425,6 +466,7 @@ class CueService:
         self.store.reset(event_id)
         self._skipped.pop(event_id, None)
         self._tips.pop(event_id, None)
+        self.auto_seed_setlist(event_id)
         self.engine.recompute(event_id)
         self.broadcast_state(event_id)
 

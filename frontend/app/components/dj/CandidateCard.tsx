@@ -60,12 +60,14 @@ export function CandidateCard({
   accent,
   rank,
   decision,
+  tipMinor,
   onDecide,
 }: {
   candidate: Candidate;
   accent: string;
   rank: number;
   decision: DJAction | null;
+  tipMinor: number;
   onDecide: (action: DJAction) => void;
 }) {
   const { track, reasons, bpm_delta: delta, score } = candidate;
@@ -139,6 +141,21 @@ export function CandidateCard({
           <span className="mt-1 block text-[9px] uppercase tracking-[0.14em] text-mist/60">
             match
           </span>
+          {tipMinor > 0 && (
+            <span
+              className="tnum mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+              style={{
+                background: "color-mix(in oklab, var(--color-tip) 15%, transparent)",
+                color: "var(--color-tip)",
+                border: "1px solid color-mix(in oklab, var(--color-tip) 35%, transparent)",
+              }}
+            >
+              <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
+                <path d="M8 1a1 1 0 0 1 .894.553l.448.894H12a1 1 0 0 1 .707 1.707L11.414 5.5l.293.293a1 1 0 0 1-1.414 1.414L10 6.914l-.293.293a1 1 0 0 1-1.414 0L8 6.914l-.293.293a1 1 0 0 1-1.414 0L6 6.914l-.293.293a1 1 0 0 1-1.414-1.414l.293-.293-1.293-1.346A1 1 0 0 1 4 2.447h2.658l.448-.894A1 1 0 0 1 8 1ZM5 9a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4.5a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 5 13.5V9Z" />
+              </svg>
+              ₹{(tipMinor / 100).toFixed(0)}
+            </span>
+          )}
         </div>
       </div>
 

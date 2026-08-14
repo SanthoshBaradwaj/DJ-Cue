@@ -55,16 +55,25 @@ function MicroStat({ value, label }: { value: string; label: string }) {
   );
 }
 
+function rupees(minor: number): string {
+  const whole = minor / 100;
+  return `₹${whole % 1 === 0 ? whole.toFixed(0) : whole.toFixed(2)}`;
+}
+
 export function TopBar({
   eventName,
   stats,
   status,
+  tipTotals,
 }: {
   eventName: string;
   stats: EventStats;
   status: FeedStatus;
+  tipTotals?: Record<string, number>;
 }) {
   const pct = compressionPct(stats);
+  const pending = tipTotals?.pending ?? 0;
+  const captured = tipTotals?.captured ?? 0;
 
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-ink-line/80 bg-ink/85 backdrop-blur-xl">
@@ -164,6 +173,24 @@ export function TopBar({
               label="engine"
             />
           </div>
+          {(pending > 0 || captured > 0) && (
+            <div
+              className="flex items-center gap-2 rounded-full border px-3 py-1.5"
+              style={{
+                borderColor: "color-mix(in oklab, var(--color-tip) 40%, transparent)",
+                background: "color-mix(in oklab, var(--color-tip) 12%, transparent)",
+              }}
+              title="Tips: captured (earned) vs pending (authorized)"
+            >
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="var(--color-tip)" aria-hidden="true">
+                <path d="M8 1a1 1 0 0 1 .894.553l.448.894H12a1 1 0 0 1 .707 1.707L11.414 5.5l.293.293a1 1 0 0 1-1.414 1.414L10 6.914l-.293.293a1 1 0 0 1-1.414 0L8 6.914l-.293.293a1 1 0 0 1-1.414 0L6 6.914l-.293.293a1 1 0 0 1-1.414-1.414l.293-.293-1.293-1.346A1 1 0 0 1 4 2.447h2.658l.448-.894A1 1 0 0 1 8 1ZM5 9a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4.5a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 5 13.5V9Z" />
+              </svg>
+              <span className="tnum text-[12px] font-bold" style={{ color: "var(--color-tip)" }}>
+                {captured > 0 ? `${rupees(captured)} earned` : `${rupees(pending)} tips`}
+                {captured > 0 && pending > 0 && ` (+${rupees(pending)})`}
+              </span>
+            </div>
+          )}
           <StatusPill status={status} />
         </div>
       </div>

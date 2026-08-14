@@ -11,6 +11,9 @@ ranker scores it against a wave in the shared intent vector space from
 
 from __future__ import annotations
 
+import json
+import logging
+import os
 import re
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional
@@ -20,23 +23,70 @@ from . import audio
 from .library import TRACKS
 from .ranker import Ranker
 
+log = logging.getLogger("cue.catalog")
+
 _WORD_RE = re.compile(r"[a-z0-9']+")
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_CUSTOM_TRACKS_PATH = os.path.join(_ROOT, "data", "custom_tracks.json")
 
 
 def _tokens(text: str) -> List[str]:
     return _WORD_RE.findall((text or "").lower())
 
 
+def _load_custom_tracks() -> List[Track]:
+    if not os.path.exists(_CUSTOM_TRACKS_PATH):
+        return []
+    try:
+        with open(_CUSTOM_TRACKS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return [Track(**item) for item in data]
+    except Exception as exc:
+        log.warning("failed to load custom tracks from %s: %s", _CUSTOM_TRACKS_PATH, exc)
+        return []
+
+
+def _save_custom_tracks(tracks: List[Track]) -> None:
+    try:
+        os.makedirs(os.path.dirname(_CUSTOM_TRACKS_PATH), exist_ok=True)
+        with open(_CUSTOM_TRACKS_PATH, "w", encoding="utf-8") as f:
+            json.dump([t.model_dump() for t in tracks], f, indent=2)
+    except Exception as exc:
+        log.warning("failed to save custom tracks to %s: %s", _CUSTOM_TRACKS_PATH, exc)
+
+
 class Catalog:
-    """Read-only access to the seeded track library."""
+    """Read and write access to the track library, with dynamic custom track support."""
 
     def __init__(self, tracks: Optional[List[Track]] = None):
-        self._tracks: List[Track] = list(TRACKS if tracks is None else tracks)
+        base_tracks = list(TRACKS if tracks is None else tracks)
+        custom_tracks = _load_custom_tracks() if tracks is None else []
+        self._custom_tracks: List[Track] = custom_tracks
+        self._tracks: List[Track] = list(base_tracks) + list(custom_tracks)
         self._by_id: Dict[str, Track] = {t.id: t for t in self._tracks}
         # Anything sitting in audio/ wins over the browser's synth for that
         # track. Idempotent: with an empty directory this is a single stat call
         # and every audio_file stays None.
         self.audio_matched: int = audio.attach(self._tracks)
+
+    def add_track(self, track: Track, persist: bool = True) -> Track:
+        """Dynamically add a discovered track to the catalog."""
+        if track.id in self._by_id:
+            return self._by_id[track.id]
+        
+        # Check for title/artist duplicate
+        for existing in self._tracks:
+            if existing.title.lower() == track.title.lower() and existing.artist.lower() == track.artist.lower():
+                return existing
+
+        self._tracks.append(track)
+        self._by_id[track.id] = track
+        if persist:
+            self._custom_tracks.append(track)
+            _save_custom_tracks(self._custom_tracks)
+        log.info("dynamically registered track: %s by %s (%s)", track.title, track.artist, track.id)
+        return track
 
     def __len__(self) -> int:
         return len(self._tracks)

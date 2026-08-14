@@ -70,6 +70,7 @@ export function WaveCard({
   decisions,
   retired,
   onDecide,
+  trackTipMap,
 }: {
   view: WaveView;
   rank: number;
@@ -79,6 +80,7 @@ export function WaveCard({
   decisions: Record<string, DJAction>;
   retired: ReadonlySet<string>;
   onDecide: (trackId: string, action: DJAction, waveId: string) => void;
+  trackTipMap: Map<string, number>;
 }) {
   const { wave, candidates } = view;
   const [open, setOpen] = useState(false);
@@ -255,6 +257,7 @@ export function WaveCard({
                     accent={accent}
                     rank={i + 1}
                     decision={decisions[c.track.id] ?? null}
+                    tipMinor={trackTipMap.get(c.track.id) ?? 0}
                     onDecide={(action) => onDecide(c.track.id, action, wave.id)}
                   />
                 ))}

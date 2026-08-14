@@ -303,12 +303,26 @@ add("shankar ehsaan loy", S("hindi", "bollywood", "euphoric", "2000s",
                             "Shankar-Ehsaan-Loy", energy=0.62, dance=0.68))
 add("amit trivedi", S("hindi", "bollywood", "euphoric", "2010s",
                       "Amit Trivedi", energy=0.62, dance=0.65))
-add("ilaiyaraaja|ilayaraja", S("tamil", "bollywood", "nostalgic", "1980s",
-                               "Ilaiyaraaja", energy=0.45, dance=0.50))
-add("anirudh|anirudh ravichander", S("tamil", "bollywood", "hype", "2020s",
-                                     "Anirudh", energy=0.82, dance=0.88))
-add("devi sri prasad|dsp", S("telugu", "bollywood", "hype celebratory", "2010s",
-                             "Devi Sri Prasad", energy=0.82, dance=0.88))
+add("ilaiyaraaja|ilayaraja", S("tamil", "pop", "nostalgic", "1980s",
+                                "Ilaiyaraaja", energy=0.45, dance=0.50))
+add("anirudh|anirudh ravichander|ani", S("tamil", "pop", "hype celebratory", "2020s",
+                                      "Anirudh", energy=0.92, dance=0.90, w=2.0))
+add("hukum|jailer|thalaivar", S("tamil", "pop", "hype celebratory", "2020s",
+                                "Anirudh", energy=0.92, dance=0.88, w=2.0))
+add("naa ready|na ready|leo|thalapathy vijay|thalapathy", S("tamil", "pop", "hype celebratory", "2020s",
+                                                            "Anirudh", energy=0.94, dance=0.92, w=2.0))
+add("vaathi coming|vaathi|master", S("tamil", "pop", "hype celebratory", "2020s",
+                                     "Anirudh", energy=0.93, dance=0.92, w=2.0))
+add("badass|vikram|vikram title track", S("tamil", "hiphop", "hype dark", "2020s",
+                                          "Anirudh", energy=0.89, dance=0.87, w=2.0))
+add("kaavaalaa|kavala|chellamma|arabic kuthu|kuthu", S("tamil", "pop", "hype celebratory", "2020s",
+                                                       "Anirudh", energy=0.90, dance=0.90, w=2.0))
+add("rowdy baby|dhanush|kolaveri|why this kolaveri", S("tamil", "pop", "celebratory hype", "2010s",
+                                                       "Dhanush", energy=0.88, dance=0.90, w=2.0))
+add("aaluma doluma|thala|ajith", S("tamil", "pop", "hype celebratory", "2010s",
+                                   "Anirudh", energy=0.95, dance=0.92, w=2.0))
+add("devi sri prasad|dsp", S("telugu", "pop", "hype celebratory", "2010s",
+                              "Devi Sri Prasad", energy=0.82, dance=0.88))
 
 # --- Bollywood actors (film-song requests) ---
 add("shah rukh khan|shahrukh khan|shah rukh|shahrukh|srk|king khan",
@@ -645,7 +659,7 @@ add("punjabi|panjabi|punjab|pind|paaji", S("punjabi", energy=None, dance=0.72,
                                            w=1.6))
 add("hindi|hindustani", S("hindi", energy=None, dance=0.65, w=1.5))
 add("english|western|angrezi", S("english", w=1.2))
-add("tamil|kollywood|tamizh", S("tamil", "bollywood", dance=0.78, w=1.6))
+add("tamil|kollywood|tamizh", S("tamil", "pop", dance=0.88, w=2.0))
 add("telugu|tollywood", S("telugu", "bollywood", dance=0.80, w=1.6))
 add("spanish|espanol", S("spanish", w=1.4))
 add("arabic|khaleeji|habibi", S("arabic", dance=0.72, w=1.5))
