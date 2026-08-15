@@ -46,18 +46,18 @@ export default function EventSwitcher({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Bellevue Aug 21"
-          className="h-9 w-48 rounded-lg border border-ink-line bg-ink-raised px-3 text-[13px] text-chalk outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+          className="h-10 min-w-0 flex-1 rounded-lg border border-ink-line bg-ink-raised px-3 text-[13px] text-chalk outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70 sm:h-9 sm:w-48 sm:flex-none"
         />
         <button
           type="submit"
-          className="h-9 shrink-0 rounded-lg bg-cue-1 px-3 text-[13px] font-semibold text-white"
+          className="tap h-10 shrink-0 rounded-lg bg-cue-1 px-3 text-[13px] font-semibold text-white sm:h-9"
         >
           Start
         </button>
         <button
           type="button"
           onClick={() => setCreating(false)}
-          className="h-9 shrink-0 rounded-lg border border-ink-line px-3 text-[13px] text-mist"
+          className="tap h-10 shrink-0 rounded-lg border border-ink-line px-3 text-[13px] text-mist sm:h-9"
         >
           Cancel
         </button>
@@ -70,7 +70,7 @@ export default function EventSwitcher({
       <select
         value={activeEventId ?? ""}
         onChange={(e) => onSelect(e.target.value)}
-        className="h-9 max-w-[13rem] rounded-lg border border-ink-line bg-ink-raised px-2.5 text-[13px] font-medium text-chalk outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+        className="h-10 min-w-0 flex-1 rounded-lg border border-ink-line bg-ink-raised px-2.5 text-[13px] font-medium text-chalk outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70 sm:h-9 sm:max-w-[13rem] sm:flex-none"
       >
         {events.map((e) => (
           <option key={e.id} value={e.id}>
@@ -82,7 +82,7 @@ export default function EventSwitcher({
       <button
         type="button"
         onClick={() => setCreating(true)}
-        className="h-9 shrink-0 rounded-lg border border-ink-line px-3 text-[13px] font-semibold text-chalk transition-colors active:bg-ink-line/60"
+        className="tap h-10 shrink-0 rounded-lg border border-ink-line px-3 text-[13px] font-semibold text-chalk transition-colors active:bg-ink-line/60 sm:h-9"
       >
         + New event
       </button>

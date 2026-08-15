@@ -60,32 +60,45 @@ export function TopBar({
 }) {
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-ink-line/80 bg-ink/85 backdrop-blur-xl">
-      <div className="flex flex-wrap items-center gap-4 px-5 py-3.5 xl:gap-6 xl:px-8">
-        <div className="flex min-w-0 shrink-0 items-center gap-3.5">
+      {/* Two rows below sm (logo+status, then the event switcher full-width)
+          collapse into one row from sm up — avoids the identity group
+          overflowing a phone's width instead of wrapping cleanly. */}
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-3.5 xl:gap-6 xl:px-8">
+        {/* Block 1: identity. Row of its own on mobile; leftmost block once
+            the header goes horizontal at sm+. */}
+        <div className="flex items-center justify-between gap-3 sm:justify-start">
           <div className="flex items-baseline gap-[1px]">
             <span className="text-2xl font-black tracking-[-0.04em]" style={{ color: "var(--color-cue-1)" }}>
               DJ
             </span>
             <span className="text-2xl font-black tracking-[-0.04em] text-chalk">-CUE</span>
           </div>
-          <span className="h-6 w-px bg-ink-line" aria-hidden="true" />
-          <EventSwitcher
-            events={events}
-            activeEventId={activeEventId}
-            onSelect={onSelectEvent}
-            onCreate={onCreateEvent}
-          />
+          <span className="hidden h-6 w-px bg-ink-line sm:ml-1 sm:block" aria-hidden="true" />
+          <div className="sm:hidden">
+            <StatusPill status={status} />
+          </div>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-5">
+        {/* Block 2: event switcher, full width on mobile. */}
+        <EventSwitcher
+          events={events}
+          activeEventId={activeEventId}
+          onSelect={onSelectEvent}
+          onCreate={onCreateEvent}
+        />
+
+        {/* Block 3: stats + status, pinned right once horizontal. */}
+        <div className="flex items-center justify-between gap-4 sm:ml-auto sm:justify-end sm:gap-5">
           {stats && (
-            <div className="hidden items-center gap-5 sm:flex">
+            <div className="flex items-center gap-4 sm:gap-5">
               <MicroStat value={String(stats.total_requests)} label="requests" />
               <MicroStat value={String(stats.unique_songs)} label="songs" />
               <MicroStat value={String(stats.unique_sessions)} label="phones" />
             </div>
           )}
-          <StatusPill status={status} />
+          <div className="hidden sm:block">
+            <StatusPill status={status} />
+          </div>
         </div>
       </div>
     </header>

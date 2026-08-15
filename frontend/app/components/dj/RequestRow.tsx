@@ -26,10 +26,10 @@ export function RequestRow({
   return (
     <li
       data-flip-key={request.id}
-      className="card flex items-center gap-4 px-4 py-3.5 sm:px-5"
+      className="card flex items-center gap-2.5 px-3 py-3.5 sm:gap-4 sm:px-5"
     >
       <span
-        className="tnum flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+        className="tnum hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold sm:flex"
         style={{
           background:
             rank === 0
@@ -55,7 +55,7 @@ export function RequestRow({
       </div>
 
       <div
-        className="tnum flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[15px] font-bold"
+        className="tnum flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[14px] font-bold sm:px-3 sm:text-[15px]"
         style={{
           background: hot
             ? "color-mix(in oklab, var(--color-cue-1) 16%, transparent)"
@@ -67,16 +67,17 @@ export function RequestRow({
         {request.request_count}×
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         <button
           type="button"
           onClick={onPlayed}
-          className="tap flex h-11 items-center gap-1.5 rounded-xl bg-go/15 px-3.5 text-[13px] font-bold text-go transition-colors active:bg-go/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70"
+          aria-label="Mark as played"
+          className="tap flex h-11 items-center gap-1.5 rounded-xl bg-go/15 px-2.5 text-[13px] font-bold text-go transition-colors active:bg-go/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70 sm:px-3.5"
         >
           <svg viewBox="0 0 12 12" className="h-3 w-3 shrink-0" aria-hidden="true">
             <path d="M3 1.8v8.4L10 6z" fill="currentColor" />
           </svg>
-          Played
+          <span className="hidden sm:inline">Played</span>
         </button>
         <button
           type="button"

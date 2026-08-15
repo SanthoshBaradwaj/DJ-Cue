@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-from .. import itunes
+from .. import catalog_search
 from ..contracts import DashboardState, Event, RequestAck, Song, SongRequest, WSMessage
 from ..db import get_store
 from ..events import bus
@@ -44,7 +44,7 @@ class CueService:
     # -- catalog ----------------------------------------------------------
 
     def search_songs(self, query: str, genre: Optional[str], limit: int = 8) -> List[Song]:
-        return itunes.search(query, genre, limit)
+        return catalog_search.search(query, genre, limit)
 
     # -- dashboard ----------------------------------------------------------
 

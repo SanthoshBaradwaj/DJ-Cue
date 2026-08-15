@@ -6,9 +6,11 @@ import { haptic } from "./motion";
 /**
  * Screen 1 of the guest flow: one tap, no typing.
  *
- * Big thumb-sized buttons grouped North/South India so a guest scanning the
- * QR in a dark, loud room can find their language in under a second — no
- * reading, no thinking.
+ * One flowing grid, not two labeled sections. `GENRES` is already ordered so
+ * north/south genres interleave rather than cluster -- there's no "north
+ * block, then south block" to read past, no side that visually leads, and
+ * moving from a Punjabi tap to a Tamil one is just eye movement across the
+ * same grid, not a jump between zones.
  */
 export default function GenreGrid({
   eventLine,
@@ -17,9 +19,6 @@ export default function GenreGrid({
   eventLine: string;
   onPick: (genreKey: string) => void;
 }) {
-  const north = GENRES.filter((g) => g.region === "north");
-  const south = GENRES.filter((g) => g.region === "south");
-
   const pick = (key: string) => {
     haptic(12);
     onPick(key);
@@ -47,36 +46,18 @@ export default function GenreGrid({
       </h1>
       <p className="mt-2 text-[15px] text-mist">Pick a genre to request a song.</p>
 
-      <GenreSection title="North India" genres={north} onPick={pick} delay={80} />
-      <GenreSection title="South India" genres={south} onPick={pick} delay={160} />
-    </div>
-  );
-}
-
-function GenreSection({
-  title,
-  genres,
-  onPick,
-  delay,
-}: {
-  title: string;
-  genres: { key: string; label: string }[];
-  onPick: (key: string) => void;
-  delay: number;
-}) {
-  return (
-    <section
-      className="mt-8 animate-rise"
-      style={{ animationDelay: `${delay}ms`, animationFillMode: "backwards" }}
-    >
-      <h2 className="mb-3 text-[13px] tracking-[0.14em] text-mist/80 uppercase">{title}</h2>
-      <div className="grid grid-cols-2 gap-3">
-        {genres.map((g) => (
+      <div className="mt-7 grid grid-cols-2 gap-3">
+        {GENRES.map((g, i) => (
           <button
             key={g.key}
             type="button"
-            onClick={() => onPick(g.key)}
-            className="tap flex h-24 flex-col items-center justify-center gap-1 rounded-2xl border border-ink-line bg-ink-card/80 px-3 text-center transition-all duration-150 active:scale-[0.97] active:border-cue-1/60 active:bg-cue-1/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+            onClick={() => pick(g.key)}
+            style={{ animationDelay: `${60 + i * 45}ms`, animationFillMode: "backwards" }}
+            className={`tap flex h-24 flex-col items-center justify-center gap-1 rounded-2xl border border-ink-line bg-ink-card/80 px-3 text-center transition-all duration-150 active:scale-[0.96] active:border-cue-1/60 active:bg-cue-1/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70 animate-rise ${
+              // 5 genres in a 2-column grid leaves one odd item; give it the
+              // full row rather than letting it sit lopsided next to a gap.
+              GENRES.length % 2 === 1 && i === GENRES.length - 1 ? "col-span-2" : ""
+            }`}
           >
             <span className="text-[19px] font-semibold tracking-[-0.01em] text-chalk">
               {g.label}
@@ -84,6 +65,6 @@ function GenreSection({
           </button>
         ))}
       </div>
-    </section>
+    </div>
   );
 }

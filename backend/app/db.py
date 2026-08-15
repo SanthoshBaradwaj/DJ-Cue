@@ -199,15 +199,18 @@ class Store:
     def set_request_status(
         self, event_id: str, request_id: str, status: str
     ) -> Optional[SongRequest]:
-        res = (
-            self.client.table("requests")
-            .update({"status": status})
-            .eq("id", request_id)
-            .eq("event_id", event_id)
-            .execute()
-        )
+        # RLS grants no direct UPDATE on requests -- this goes through a
+        # SECURITY DEFINER function so a status change is always a validated
+        # transition, not a raw write anyone holding the anon key could fire
+        # at any row with any string.
+        res = self.client.rpc(
+            "set_request_status",
+            {"p_event_id": event_id, "p_request_id": request_id, "p_status": status},
+        ).execute()
         rows = res.data or []
-        return _row_to_request(rows[0]) if rows else None
+        if not rows or rows[0] is None or rows[0].get("id") is None:
+            return None
+        return _row_to_request(rows[0])
 
     def stats(self, event_id: str) -> EventStats:
         queued = self.queued_requests(event_id)
