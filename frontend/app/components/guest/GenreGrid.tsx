@@ -23,12 +23,16 @@ export default function GenreGrid({
   eventLine,
   djStatus,
   pulse,
+  pulseLimited,
+  pulsePending,
   onPick,
   onPulseChange,
 }: {
   eventLine: string;
   djStatus?: DJStatus;
   pulse?: PulseStatus | null;
+  pulseLimited?: boolean;
+  pulsePending?: boolean;
   onPick: (genreKey: string) => void;
   onPulseChange?: (status: PulseStatus) => void;
 }) {
@@ -60,7 +64,12 @@ export default function GenreGrid({
       </header>
 
       {onPulseChange && (
-        <PulseToggle value={pulse ?? null} onChange={onPulseChange} />
+        <PulseToggle
+          value={pulse ?? null}
+          limited={Boolean(pulseLimited)}
+          pending={Boolean(pulsePending)}
+          onChange={onPulseChange}
+        />
       )}
 
       {closed ? (

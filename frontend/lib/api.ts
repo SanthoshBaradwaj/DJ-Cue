@@ -6,6 +6,7 @@ import type {
   DJStatus,
   EventRecord,
   HealthReport,
+  PulseAck,
   PulseStatus,
   RequestAck,
   RequestStatus,
@@ -87,7 +88,7 @@ export const api = {
         body: JSON.stringify({ status }),
       }),
     setPulse: (eventId: string, status: PulseStatus) =>
-      json<{ ok: boolean }>(`/api/events/${encodeURIComponent(eventId)}/pulse`, {
+      json<PulseAck>(`/api/events/${encodeURIComponent(eventId)}/pulse`, {
         method: "POST",
         body: JSON.stringify({ session_id: sessionId(), status }),
       }),

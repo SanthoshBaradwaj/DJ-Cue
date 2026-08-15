@@ -18,6 +18,7 @@ from app.contracts import (  # noqa: E402
     DashboardState,
     Event,
     EventStats,
+    PulseAck,
     RequestAck,
     Song,
     SongRequest,
@@ -32,6 +33,7 @@ class FakeService:
     def __init__(self):
         self.events = []
         self.requests = {}
+        self.pulse_votes = {}
         self._next = 1
 
     def _id(self, prefix):
@@ -57,7 +59,17 @@ class FakeService:
         return next((e for e in self.events if e.id == event_id), None)
 
     def set_pulse(self, event_id, session_id, status):
-        return any(e.id == event_id for e in self.events)
+        if not any(e.id == event_id for e in self.events):
+            return PulseAck(message="event not found")
+        key = (event_id, session_id)
+        prev_status, count = self.pulse_votes.get(key, (None, 0))
+        if prev_status == status:
+            return PulseAck(status=status, toggle_count=count, limited=False)
+        if count >= 5:
+            return PulseAck(status=prev_status, toggle_count=count, limited=True, message="slow down")
+        count += 1
+        self.pulse_votes[key] = (status, count)
+        return PulseAck(status=status, toggle_count=count, limited=False)
 
     def search_songs(self, query, genre, limit=8):
         return [
@@ -314,12 +326,44 @@ def test_pulse_vote_accepted_and_validated(monkeypatch):
         f"/api/events/{event['id']}/pulse", json={"session_id": "s1", "status": "single"}
     )
     assert ok.status_code == 200
-    assert ok.json()["ok"] is True
+    body = ok.json()
+    assert body["status"] == "single"
+    assert body["toggle_count"] == 1
+    assert body["limited"] is False
 
     bad = client.post(
         f"/api/events/{event['id']}/pulse", json={"session_id": "s1", "status": "married"}
     )
     assert bad.status_code == 422
+
+
+def test_pulse_vote_capped_at_five_toggles(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Pulse Limit Test"}).json()
+
+    def vote(status):
+        return client.post(
+            f"/api/events/{event['id']}/pulse", json={"session_id": "s1", "status": status}
+        ).json()
+
+    # Alternate five times -- each one is a genuine change, so all count.
+    for i in range(5):
+        body = vote("single" if i % 2 == 0 else "committed")
+        assert body["limited"] is False
+    assert body["toggle_count"] == 5
+    assert body["status"] == "single"
+
+    # A 6th real change (to the opposite status) is over the cap.
+    limited = vote("committed")
+    assert limited["limited"] is True
+    assert limited["status"] == "single"  # unchanged
+    assert limited["message"]
+
+    # But re-selecting the status you're already on is never a "change" --
+    # always allowed, never counted against the cap.
+    noop = vote("single")
+    assert noop["limited"] is False
+    assert noop["toggle_count"] == 5
 
 
 def test_health_reports_db_status(monkeypatch):

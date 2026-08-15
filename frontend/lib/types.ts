@@ -6,6 +6,15 @@ export type DJStatus = "open" | "closed";
  * gates anything, and never shown per-person, only as an aggregate. */
 export type PulseStatus = "single" | "committed";
 
+export interface PulseAck {
+  status: PulseStatus | null;
+  /** Real changes only -- re-selecting the active status doesn't count. */
+  toggle_count: number;
+  /** True once this session has hit the 5-change cap for the event. */
+  limited: boolean;
+  message: string | null;
+}
+
 export interface EventRecord {
   id: string;
   name: string;
@@ -49,6 +58,9 @@ export interface SongRequest {
   request_count: number;
   status: RequestStatus;
   artwork_url: string | null;
+  /** Real, measured tempo from Deezer's catalog metadata -- never AI
+   * estimated. Only present for a Deezer-sourced pick; null otherwise. */
+  bpm: number | null;
   created_at: number;
   updated_at: number;
 }

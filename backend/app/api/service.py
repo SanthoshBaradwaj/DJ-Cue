@@ -12,7 +12,16 @@ import logging
 from typing import List, Optional
 
 from .. import catalog_search
-from ..contracts import DashboardState, DBHealth, Event, RequestAck, Song, SongRequest, WSMessage
+from ..contracts import (
+    DashboardState,
+    DBHealth,
+    Event,
+    PulseAck,
+    RequestAck,
+    Song,
+    SongRequest,
+    WSMessage,
+)
 from ..db import get_store
 from ..events import bus
 
@@ -43,11 +52,11 @@ class CueService:
     def db_health(self) -> DBHealth:
         return self.store.health()
 
-    def set_pulse(self, event_id: str, session_id: str, status: str) -> bool:
-        ok = self.store.set_pulse(event_id, session_id, status)
-        if ok:
+    def set_pulse(self, event_id: str, session_id: str, status: str) -> PulseAck:
+        ack = self.store.set_pulse(event_id, session_id, status)
+        if ack.status is not None and not ack.limited:
             self.broadcast_state(event_id)
-        return ok
+        return ack
 
     def resolve_event_id(self, event_id: Optional[str]) -> str:
         """An explicit id wins; otherwise fall back to the latest active
@@ -84,6 +93,12 @@ class CueService:
         song_id: Optional[str],
         artwork_url: Optional[str] = None,
     ) -> RequestAck:
+        # Real BPM, resolved once here rather than at search time -- only
+        # for a genuine Deezer catalog match, and only stored if this turns
+        # out to be a fresh row (the RPC ignores it on a duplicate bump).
+        bpm = None
+        if song_id and song_id.startswith("deezer:"):
+            bpm = catalog_search.deezer_track_bpm(song_id.split(":", 1)[1])
         ack = self.store.submit_request(
             event_id=event_id,
             session_id=session_id,
@@ -92,6 +107,7 @@ class CueService:
             genre=genre,
             song_id=song_id,
             artwork_url=artwork_url,
+            bpm=bpm,
         )
         if ack.request_id:
             bus.publish(

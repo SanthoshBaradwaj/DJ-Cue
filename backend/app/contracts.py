@@ -52,6 +52,17 @@ class PulseUpdate(BaseModel):
     status: str  # "single" | "committed"
 
 
+class PulseAck(BaseModel):
+    # None only when the event/session round trip itself failed -- the
+    # guest's own vote never gets silently dropped otherwise.
+    status: Optional[str] = None
+    # Real changes only -- re-selecting the already-active status doesn't
+    # count. Capped at 5 (enforced in the set_pulse_vote Postgres function).
+    toggle_count: int = 0
+    limited: bool = False
+    message: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Catalog -- the songs a guest can pick from once they've tapped a genre.
 # ---------------------------------------------------------------------------
@@ -94,6 +105,11 @@ class SongRequest(BaseModel):
     # full lifecycle survives for post-event analysis.
     status: str = "queued"
     artwork_url: Optional[str] = None
+    # Real, measured tempo from Deezer's own catalog metadata -- never AI
+    # estimated, never client-supplied. Only present for songs picked from
+    # a live Deezer search result; null otherwise (iTunes-sourced picks,
+    # typed-anyway requests, and the static "popular right now" seed).
+    bpm: Optional[int] = None
     created_at: float = 0.0
     updated_at: float = 0.0
 

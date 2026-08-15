@@ -25,7 +25,7 @@ Use `frontend/lib/api.ts` — never hand-roll a fetch.
 | GET | `/api/events` | — | `{events: Event[]}` |
 | POST | `/api/events` | `{name}` | `Event` |
 | POST | `/api/events/{id}/status` | `{status}` | `Event` |
-| POST | `/api/events/{id}/pulse` | `{session_id, status}` | `{ok}` |
+| POST | `/api/events/{id}/pulse` | `{session_id, status}` | `PulseAck` |
 | GET | `/api/catalog/search?q=&genre=&limit=` | — | `{songs: Song[]}` |
 | POST | `/api/requests` | `{event_id, session_id, genre, song_title, song_artist?, song_id?, artwork_url?}` | `RequestAck` |
 | GET | `/api/dashboard?event_id=` | — | `DashboardState` |
@@ -46,7 +46,18 @@ DJ opened/closed the floor.
 `pulse` status is `"single" \| "committed"` — optional, guest-set, never
 required, aggregated into `EventStats.pulse_single` / `pulse_committed` /
 `pulse_total`. One vote per session per event; voting again overwrites the
-same guest's prior vote.
+same guest's prior vote. Capped at 5 real status *changes* per session per
+event (re-selecting the already-active status is never counted) — enforced
+inside `set_pulse_vote`, which returns `PulseAck { status, toggle_count,
+limited, message }`; once `limited` is true the vote is rejected and
+`message` carries a light "that's enough changing" line for the UI.
+
+Real-tempo (`bpm`) is resolved server-side, once, at submit time, only for
+a song picked from a live Deezer search result (`song_id` starting with
+`deezer:`) — a direct read of Deezer's own per-track `bpm` field, never an
+estimate. It has no bearing on iTunes-sourced picks or the static
+"trending" seed shown before a guest starts typing, which is why `bpm` is
+frequently `null` on a `SongRequest`.
 
 ## WebSocket
 
@@ -76,9 +87,10 @@ Genre    { key, label, region }              // region: "north" | "south" | "oth
 Song     { id, title, artist, genre, artwork_url }
 SongRequest {
   id, event_id, song_id, song_title, song_artist, genre,
-  request_count, status, artwork_url, created_at, updated_at
+  request_count, status, artwork_url, bpm, created_at, updated_at
 }                                              // status: "queued" | "played" | "dismissed"
 RequestAck { request_id, song_title, request_count, already_counted, message }
+PulseAck { status, toggle_count, limited, message }
 EventStats {
   total_requests, unique_songs, unique_sessions,
   pulse_single, pulse_committed, pulse_total

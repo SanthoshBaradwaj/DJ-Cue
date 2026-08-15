@@ -22,7 +22,7 @@ from typing import Dict, List, Optional
 from supabase import Client, create_client
 
 from .config import settings
-from .contracts import DBHealth, Event, EventStats, RequestAck, SongRequest
+from .contracts import DBHealth, Event, EventStats, PulseAck, RequestAck, SongRequest
 
 log = logging.getLogger("cue.db")
 
@@ -56,6 +56,7 @@ def _row_to_request(row: Dict) -> SongRequest:
         request_count=row.get("request_count", 1),
         status=row.get("status", "queued"),
         artwork_url=row.get("artwork_url"),
+        bpm=row.get("bpm"),
         created_at=_epoch(row.get("created_at")),
         updated_at=_epoch(row.get("updated_at")),
     )
@@ -153,6 +154,7 @@ class Store:
         genre: str = "",
         song_id: Optional[str] = None,
         artwork_url: Optional[str] = None,
+        bpm: Optional[int] = None,
     ) -> RequestAck:
         res = self.client.rpc(
             "submit_song_request",
@@ -165,6 +167,7 @@ class Store:
                 "p_genre": genre,
                 "p_cooldown_seconds": settings.submit_cooldown_s,
                 "p_artwork_url": artwork_url,
+                "p_bpm": bpm,
             },
         ).execute()
         rows = res.data or []
@@ -261,14 +264,30 @@ class Store:
             log.warning("db health check failed: %s", exc)
             return DBHealth(ok=False, error=str(exc))
 
-    def set_pulse(self, event_id: str, session_id: str, status: str) -> bool:
+    def set_pulse(self, event_id: str, session_id: str, status: str) -> PulseAck:
         # RLS grants no direct write on pulse_votes -- same pattern as every
         # other mutation, routed through a validated SECURITY DEFINER upsert.
+        # The 5-toggle cap is enforced inside that function, not here, so it
+        # can't be bypassed by calling PostgREST directly.
         res = self.client.rpc(
             "set_pulse_vote",
             {"p_event_id": event_id, "p_session_id": session_id, "p_status": status},
         ).execute()
-        return bool(res.data)
+        rows = res.data or []
+        if not rows:
+            return PulseAck(message="Couldn't reach the DJ just then.")
+        row = rows[0]
+        limited = bool(row.get("limited"))
+        return PulseAck(
+            status=row.get("status"),
+            toggle_count=row.get("toggle_count") or 0,
+            limited=limited,
+            message=(
+                "That's five changes -- we hear you, tough crowd. Locking it in for tonight!"
+                if limited
+                else None
+            ),
+        )
 
     def stats(self, event_id: str) -> EventStats:
         queued = self.queued_requests(event_id)

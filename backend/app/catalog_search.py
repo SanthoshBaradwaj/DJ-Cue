@@ -26,7 +26,9 @@ log = logging.getLogger("cue.catalog_search")
 
 _ITUNES_URL = "https://itunes.apple.com/search"
 _DEEZER_URL = "https://api.deezer.com/search"
+_DEEZER_TRACK_URL = "https://api.deezer.com/track"
 _TIMEOUT_S = 5.0
+_BPM_TIMEOUT_S = 3.0
 
 
 def _search_itunes(term: str, limit: int) -> List[Song]:
@@ -96,6 +98,32 @@ def _search_deezer(term: str, limit: int) -> List[Song]:
             )
         )
     return songs
+
+
+def deezer_track_bpm(deezer_track_id: str) -> Optional[int]:
+    """Real, measured tempo from Deezer's own catalog -- never estimated.
+
+    Deezer's *search* endpoint doesn't include bpm (confirmed by its own
+    docs), only the per-track detail endpoint does, so this is a second,
+    deliberate call made once at submit time -- not per search result. Short
+    timeout and fail-soft: a slow or missing bpm must never block or fail a
+    guest's request, it just means no label shows on the DJ dashboard.
+    """
+    try:
+        res = httpx.get(f"{_DEEZER_TRACK_URL}/{deezer_track_id}", timeout=_BPM_TIMEOUT_S)
+        res.raise_for_status()
+        bpm = res.json().get("bpm")
+    except Exception as exc:
+        log.info("Deezer bpm lookup failed for track %s: %s", deezer_track_id, exc)
+        return None
+    # Deezer returns 0 (not null) when it simply has no tempo data for a
+    # track -- that's "unknown", not "zero BPM", so treat it as absent.
+    if not bpm:
+        return None
+    try:
+        return round(float(bpm))
+    except (TypeError, ValueError):
+        return None
 
 
 def search(query: str, genre: Optional[str] = None, limit: int = 8) -> List[Song]:

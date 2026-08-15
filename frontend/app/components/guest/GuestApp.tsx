@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { DJStatus, PulseStatus, RequestAck } from "@/lib/types";
 import Confirmation from "./Confirmation";
@@ -33,6 +33,19 @@ export default function GuestApp() {
   const [ack, setAck] = useState<RequestAck | null>(null);
   const [djStatus, setDjStatus] = useState<DJStatus | undefined>(undefined);
   const [pulse, setPulse] = useState<PulseStatus | null>(null);
+  const [pulseLimited, setPulseLimited] = useState(false);
+  const [pulsePending, setPulsePending] = useState(false);
+
+  const eventIdRef = useRef(eventId);
+  useEffect(() => {
+    eventIdRef.current = eventId;
+  }, [eventId]);
+
+  // How often to re-check dj_status while the app is open. The DJ flipping
+  // open<->closed must reach a phone that already has this page open --
+  // without this, a guest sees a stale "taking requests" (or is stuck on
+  // the closed screen after the DJ reopens) until they manually reload.
+  const STATUS_POLL_MS = 4000;
 
   useEffect(() => {
     let alive = true;
@@ -40,20 +53,28 @@ export default function GuestApp() {
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("event")
         : null;
-    api
-      .config(fromUrl ?? undefined)
-      .then((cfg) => {
-        if (!alive) return;
-        setEventId(cfg.event_id);
-        setDjStatus(cfg.dj_status);
-      })
-      .catch(() => {
-        if (fromUrl && alive) setEventId(fromUrl);
-        /* dj status stays unknown; resolved lazily on submit if this never lands */
-      });
+
+    const refreshStatus = (idHint?: string | null) => {
+      api
+        .config(idHint ?? fromUrl ?? undefined)
+        .then((cfg) => {
+          if (!alive) return;
+          setEventId(cfg.event_id);
+          setDjStatus(cfg.dj_status);
+        })
+        .catch(() => {
+          if (fromUrl && alive) setEventId((prev) => prev ?? fromUrl);
+          /* dj status stays whatever it last was; next poll tick retries */
+        });
+    };
+
+    refreshStatus();
+    const timer = setInterval(() => refreshStatus(eventIdRef.current), STATUS_POLL_MS);
     return () => {
       alive = false;
+      clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- eventIdRef sidesteps re-subscribing the interval on every id change
   }, []);
 
   const pickGenre = useCallback((key: string) => {
@@ -64,12 +85,21 @@ export default function GuestApp() {
 
   const changePulse = useCallback(
     (status: PulseStatus) => {
-      setPulse(status);
-      // Optional and non-blocking -- a phone with a dead connection just
-      // doesn't move the aggregate; the guest's own tap already registered.
-      if (eventId) api.events.setPulse(eventId, status).catch(() => undefined);
+      if (!eventId || pulsePending || pulseLimited) return;
+      setPulsePending(true);
+      api.events
+        .setPulse(eventId, status)
+        .then((ack) => {
+          if (ack.limited) {
+            setPulseLimited(true);
+            return;
+          }
+          if (ack.status) setPulse(ack.status);
+        })
+        .catch(() => undefined)
+        .finally(() => setPulsePending(false));
     },
-    [eventId],
+    [eventId, pulsePending, pulseLimited],
   );
 
   const submit = useCallback(
@@ -151,6 +181,8 @@ export default function GuestApp() {
           eventLine={eventLine}
           djStatus={djStatus}
           pulse={pulse}
+          pulseLimited={pulseLimited}
+          pulsePending={pulsePending}
           onPick={pickGenre}
           onPulseChange={changePulse}
         />

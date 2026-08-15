@@ -121,10 +121,10 @@ def update_pulse(event_id: str, payload: PulseUpdate):
     if payload.status not in ("single", "committed"):
         return JSONResponse(status_code=422, content={"detail": "unknown pulse status"})
     session_id = (payload.session_id or "").strip() or ("sess_%s" % uuid.uuid4().hex[:10])
-    ok = get_service().set_pulse(event_id, session_id, payload.status)
-    if not ok:
+    ack = get_service().set_pulse(event_id, session_id, payload.status)
+    if ack.status is None and not ack.limited:
         return JSONResponse(status_code=404, content={"detail": "event not found"})
-    return {"ok": True}
+    return ack.model_dump(mode="json")
 
 
 @app.get("/api/config")

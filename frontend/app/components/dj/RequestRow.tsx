@@ -74,6 +74,14 @@ export function RequestRow({
               {genreLabel(request.genre)}
             </span>
           ) : null}
+          {request.bpm ? (
+            <span
+              className="tnum shrink-0 rounded-full border border-ink-line px-2 py-0.5 text-[11px] uppercase tracking-[0.08em] text-mist/80"
+              title="Tempo, from Deezer's catalog data"
+            >
+              {request.bpm} BPM
+            </span>
+          ) : null}
         </p>
       </div>
 
