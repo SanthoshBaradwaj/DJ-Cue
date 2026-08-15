@@ -126,6 +126,51 @@ def deezer_track_bpm(deezer_track_id: str) -> Optional[int]:
         return None
 
 
+def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
+    """Fallback bpm lookup for a song picked from iTunes (or typed by hand)
+    rather than matched to a Deezer id directly.
+
+    In practice iTunes wins the search merge for most popular tracks (its
+    top hit and Deezer's often normalise to the same title/artist, so
+    Deezer's duplicate gets deduped out) -- restricting bpm lookups to
+    `song_id` starting with "deezer:" left real coverage far thinner than
+    it needs to be. This still only ever returns Deezer's own measured
+    field, and only when a search result's title AND artist match the
+    request *exactly* (case-insensitively) -- close-but-not-exact matches
+    are skipped rather than guessed, since a wrong match would attach the
+    wrong recording's tempo.
+    """
+    title = (title or "").strip()
+    artist = (artist or "").strip()
+    if not title:
+        return None
+    term = f"{title} {artist}".strip()
+    try:
+        res = httpx.get(
+            _DEEZER_URL, params={"q": term, "limit": 5}, timeout=_BPM_TIMEOUT_S
+        )
+        res.raise_for_status()
+        rows = res.json().get("data", [])
+    except Exception as exc:
+        log.info("Deezer bpm-by-title lookup failed for %r: %s", term, exc)
+        return None
+
+    norm_title = title.lower()
+    norm_artist = artist.lower()
+    for row in rows:
+        row_title = (row.get("title") or "").strip().lower()
+        row_artist = ((row.get("artist") or {}).get("name") or "").strip().lower()
+        if row_title != norm_title:
+            continue
+        if norm_artist and row_artist != norm_artist:
+            continue
+        track_id = row.get("id")
+        if track_id is None:
+            continue
+        return deezer_track_bpm(str(track_id))
+    return None
+
+
 def search(query: str, genre: Optional[str] = None, limit: int = 8) -> List[Song]:
     query = (query or "").strip()
     if not query:

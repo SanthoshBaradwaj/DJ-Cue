@@ -100,7 +100,7 @@ export default function PulseToggle({
         aria-label={
           value
             ? `Crowd pulse: ${LABEL[value]}. Tap to change.`
-            : "Optional: share whether you're single or committed"
+            : "Share whether you're single or committed"
         }
         className="tap flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-transform active:scale-90 disabled:opacity-60"
         style={{
@@ -112,11 +112,20 @@ export default function PulseToggle({
             : "color-mix(in oklab, var(--color-ink-card) 70%, transparent)",
         }}
       >
-        <span
+        <svg
           aria-hidden="true"
-          className="h-1.5 w-1.5 rounded-full transition-colors"
-          style={{ background: glyphColor, opacity: value ? 1 : 0.5 }}
-        />
+          viewBox="0 0 24 24"
+          className="h-4 w-4 transition-colors"
+          fill="none"
+          stroke={glyphColor}
+          strokeWidth="2.1"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ opacity: value ? 1 : 0.6 }}
+        >
+          {/* Heartbeat line -- reads as "pulse", not a random glyph */}
+          <path d="M2.5 12h4l2-6 3 12 2.5-9 1.5 3h6" />
+        </svg>
       </button>
 
       {/* Hover peek (desktop only, in effect -- touch has no hover) */}
@@ -125,7 +134,7 @@ export default function PulseToggle({
           aria-hidden="true"
           className="pointer-events-none absolute right-0 top-full z-20 mt-1.5 whitespace-nowrap rounded-md border border-ink-line bg-ink-card/95 px-2 py-1 text-[11px] text-mist opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
         >
-          {value ? LABEL[value] : "Optional: single or committed?"}
+          {value ? LABEL[value] : "Single or committed?"}
         </span>
       )}
 

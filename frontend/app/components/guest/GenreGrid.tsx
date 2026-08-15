@@ -1,7 +1,8 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import type { DJStatus, PulseStatus } from "@/lib/types";
-import { GENRES } from "./genres";
+import { GENRES, genreColor } from "./genres";
 import { haptic } from "./motion";
 import PulseToggle from "./PulseToggle";
 
@@ -92,24 +93,40 @@ export default function GenreGrid({
           <p className="mt-2 text-[15px] text-mist">Pick a genre to get started.</p>
 
           <div className="mt-7 grid grid-cols-2 gap-3">
-            {GENRES.map((g, i) => (
-              <button
-                key={g.key}
-                type="button"
-                onClick={() => pick(g.key)}
-                style={{ animationDelay: `${60 + i * 45}ms`, animationFillMode: "backwards" }}
-                className={`tap flex h-24 flex-col items-center justify-center gap-1 rounded-2xl border border-ink-line bg-ink-card/80 px-3 text-center transition-all duration-150 active:scale-[0.96] active:border-cue-1/60 active:bg-cue-1/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70 animate-rise ${
-                  // An odd genre count in a 2-column grid leaves one item
-                  // without a partner; give it the full row rather than a
-                  // lopsided gap.
-                  GENRES.length % 2 === 1 && i === GENRES.length - 1 ? "col-span-2" : ""
-                }`}
-              >
-                <span className="text-[19px] font-semibold tracking-[-0.01em] text-chalk">
-                  {g.label}
-                </span>
-              </button>
-            ))}
+            {GENRES.map((g, i) => {
+              const accent = genreColor(g.key);
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => pick(g.key)}
+                  style={
+                    {
+                      animationDelay: `${60 + i * 45}ms`,
+                      animationFillMode: "backwards",
+                      "--accent": accent,
+                      borderColor: `color-mix(in oklab, ${accent} 42%, var(--color-ink-line))`,
+                      background: `color-mix(in oklab, ${accent} 13%, var(--color-ink-card))`,
+                    } as CSSProperties
+                  }
+                  className={`tap group/genre relative flex h-24 flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl border px-3 text-center transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-16px_var(--accent)] hover:[border-color:color-mix(in_oklab,var(--accent)_65%,var(--color-ink-line))] hover:[background:color-mix(in_oklab,var(--accent)_20%,var(--color-ink-card))] active:translate-y-0 active:scale-[0.96] active:duration-100 active:[background:color-mix(in_oklab,var(--accent)_28%,var(--color-ink-card))] focus-visible:outline-none focus-visible:ring-2 focus-visible:[--tw-ring-color:var(--accent)] animate-rise ${
+                    // An odd genre count in a 2-column grid leaves one item
+                    // without a partner; give it the full row rather than a
+                    // lopsided gap.
+                    GENRES.length % 2 === 1 && i === GENRES.length - 1 ? "col-span-2" : ""
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-0 left-0 h-[3px] w-full origin-left scale-x-0 transition-transform duration-200 ease-out group-hover/genre:scale-x-100"
+                    style={{ background: accent }}
+                  />
+                  <span className="text-[19px] font-semibold tracking-[-0.01em] text-chalk">
+                    {g.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </>
       )}

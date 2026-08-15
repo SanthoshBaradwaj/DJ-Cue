@@ -27,3 +27,26 @@ export const GENRES: Genre[] = [
 export function genreLabel(key: string): string {
   return GENRES.find((g) => g.key === key)?.label ?? key;
 }
+
+// One accent per genre, purely for visual identity on the genre grid and to
+// tie a queued request's rank badge back to what it was requested as. A
+// deliberately muted, coordinated set (moderate saturation, similar
+// lightness) rather than a full-saturation rainbow -- meant to feel like a
+// designed palette at a glance, not a kids'-app color wheel. "other" gets a
+// neutral tone on purpose -- it isn't a real genre identity to color.
+const GENRE_COLOR: Record<string, string> = {
+  punjabi: "#ff8a63",
+  tamil: "#2ec4b6",
+  haryanvi: "#f0b94d",
+  telugu: "#5b9bf0",
+  marathi: "#b18cf0",
+  bollywood: "#f2739a",
+  english: "#6fcf97",
+  edm: "#4fd1e8",
+  other: "#9aa1ac",
+};
+const DEFAULT_GENRE_COLOR = "#9aa1ac";
+
+export function genreColor(key: string): string {
+  return GENRE_COLOR[key] ?? DEFAULT_GENRE_COLOR;
+}

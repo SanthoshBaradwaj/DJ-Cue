@@ -1,7 +1,7 @@
 "use client";
 
 import type { SongRequest } from "@/lib/types";
-import { genreLabel } from "../guest/genres";
+import { genreColor, genreLabel } from "../guest/genres";
 
 /**
  * One queued request. `request_count` is the whole ranking signal now — no
@@ -22,6 +22,7 @@ export function RequestRow({
   onDismiss: () => void;
 }) {
   const hot = request.request_count >= 3;
+  const accent = genreColor(request.genre);
 
   return (
     <li
@@ -55,9 +56,9 @@ export function RequestRow({
           style={{
             background:
               rank === 0
-                ? "color-mix(in oklab, var(--color-cue-1) 85%, var(--color-ink-card))"
-                : "var(--color-ink-line)",
-            color: rank === 0 ? "white" : "var(--color-mist)",
+                ? `color-mix(in oklab, ${accent} 85%, var(--color-ink-card))`
+                : `color-mix(in oklab, ${accent} 30%, var(--color-ink-line))`,
+            color: rank === 0 ? "white" : "var(--color-chalk)",
           }}
           aria-hidden="true"
         >
@@ -95,7 +96,20 @@ export function RequestRow({
         }}
         title={`${request.request_count} request${request.request_count === 1 ? "" : "s"}`}
       >
-        {request.request_count}×
+        <svg
+          viewBox="0 0 24 24"
+          className="h-3 w-3 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="8" r="3.2" />
+          <path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" />
+        </svg>
+        {request.request_count}
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -103,9 +117,13 @@ export function RequestRow({
           type="button"
           onClick={onPlayed}
           aria-label="Mark as played"
-          className="tap flex h-11 items-center gap-1.5 rounded-xl bg-go/15 px-2.5 text-[13px] font-bold text-go transition-colors active:bg-go/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70 sm:px-3.5"
+          className="tap group flex h-11 items-center gap-1.5 rounded-xl border border-transparent bg-go/15 px-2.5 text-[13px] font-bold text-go transition-all duration-150 hover:scale-105 hover:border-go/40 hover:bg-go/25 hover:shadow-[0_10px_28px_-12px_var(--color-go)] active:scale-95 active:bg-go/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70 sm:px-3.5"
         >
-          <svg viewBox="0 0 12 12" className="h-3 w-3 shrink-0" aria-hidden="true">
+          <svg
+            viewBox="0 0 12 12"
+            className="h-3 w-3 shrink-0 transition-transform duration-150 group-hover:scale-125 group-active:scale-100"
+            aria-hidden="true"
+          >
             <path d="M3 1.8v8.4L10 6z" fill="currentColor" />
           </svg>
           <span className="hidden sm:inline">Mark as played</span>

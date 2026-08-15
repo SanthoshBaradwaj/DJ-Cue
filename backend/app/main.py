@@ -16,7 +16,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -75,6 +75,24 @@ def lan_ip() -> str:
         return "127.0.0.1"
 
 
+def request_origin(request: Request) -> str:
+    """Best-effort public origin for the incoming request, so the QR code
+    encodes wherever this API is actually being reached -- the hosted
+    Vercel domain, a custom domain, a preview deploy -- with zero manual
+    config. Vercel (like most edge platforms) terminates TLS upstream and
+    forwards the original scheme/host via these headers rather than
+    exposing them on the connection FastAPI actually sees, so those take
+    priority over request.url, which would otherwise report plain http on
+    an internal port."""
+    scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or request.url.netloc
+    )
+    return f"{scheme}://{host}" if host else ""
+
+
 @app.get("/api/health")
 def health():
     db = get_service().db_health()
@@ -128,10 +146,15 @@ def update_pulse(event_id: str, payload: PulseUpdate):
 
 
 @app.get("/api/config")
-def config(event_id: Optional[str] = Query(default=None)):
+def config(request: Request, event_id: Optional[str] = Query(default=None)):
     resolved = get_service().resolve_event_id(event_id)
     event = get_service().get_event(resolved)
-    guest_url = settings.public_url or ("http://%s:3000" % lan_ip())
+    # Precedence: an explicit override (useful for LAN dev, where the
+    # backend's own view of its host is useless to a phone) beats the
+    # request's own origin, which beats the last-resort LAN guess.
+    guest_url = (
+        settings.public_url or request_origin(request) or ("http://%s:3000" % lan_ip())
+    )
     return {
         "event_id": resolved,
         "guest_url": "%s/?event=%s" % (guest_url, resolved),

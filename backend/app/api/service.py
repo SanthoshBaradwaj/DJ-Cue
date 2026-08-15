@@ -93,12 +93,17 @@ class CueService:
         song_id: Optional[str],
         artwork_url: Optional[str] = None,
     ) -> RequestAck:
-        # Real BPM, resolved once here rather than at search time -- only
-        # for a genuine Deezer catalog match, and only stored if this turns
-        # out to be a fresh row (the RPC ignores it on a duplicate bump).
+        # Real BPM, resolved once here rather than at search time. A direct
+        # Deezer id gives an exact track; anything else (an iTunes match --
+        # the common case, since iTunes usually wins the search merge -- or
+        # a typed "request it anyway") falls back to a strict title+artist
+        # Deezer lookup so bpm still gets a real shot at resolving instead
+        # of being permanently unreachable for the majority of requests.
         bpm = None
         if song_id and song_id.startswith("deezer:"):
             bpm = catalog_search.deezer_track_bpm(song_id.split(":", 1)[1])
+        else:
+            bpm = catalog_search.deezer_bpm_by_title_artist(song_title, song_artist)
         ack = self.store.submit_request(
             event_id=event_id,
             session_id=session_id,
