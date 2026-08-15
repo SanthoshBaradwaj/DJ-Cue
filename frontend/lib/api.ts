@@ -1,16 +1,12 @@
-// Shared API client. Owned by the integrator — UI modules import from here and
-// must not hand-roll fetches or socket handling.
+// Shared API client. Owned by the integrator — UI modules import from here
+// and must not hand-roll fetches or socket handling.
 
 import type {
   DashboardState,
-  DJAction,
-  DJState,
-  EventStats,
+  EventRecord,
   RequestAck,
-  SetlistEntry,
-  SlotProposal,
-  Tip,
-  Track,
+  RequestStatus,
+  Song,
   WSMessage,
 } from "./types";
 
@@ -62,138 +58,53 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  health: () =>
-    json<{
-      ok: boolean;
-      llm_enabled: boolean;
-      track_count: number;
-      version: string;
-    }>("/api/health"),
+  health: () => json<{ ok: boolean; supabase: boolean; version: string }>("/api/health"),
 
-  config: () =>
-    json<{ event_id: string; guest_url: string; llm_enabled: boolean }>(
-      "/api/config",
+  config: (eventId?: string) =>
+    json<{ event_id: string; guest_url: string }>(
+      `/api/config${eventId ? `?event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
 
-  submitRequest: (text: string, eventId = "default") =>
+  events: {
+    list: () => json<{ events: EventRecord[] }>("/api/events"),
+    create: (name: string) =>
+      json<EventRecord>("/api/events", { method: "POST", body: JSON.stringify({ name }) }),
+  },
+
+  searchSongs: (q: string, genre?: string, limit = 8) =>
+    json<{ songs: Song[] }>(
+      `/api/catalog/search?q=${encodeURIComponent(q)}` +
+        (genre ? `&genre=${encodeURIComponent(genre)}` : "") +
+        `&limit=${limit}`,
+    ),
+
+  submitRequest: (input: {
+    eventId: string;
+    genre: string;
+    songTitle: string;
+    songArtist?: string;
+    songId?: string | null;
+  }) =>
     json<RequestAck>("/api/requests", {
       method: "POST",
       body: JSON.stringify({
-        text,
+        event_id: input.eventId,
         session_id: sessionId(),
-        event_id: eventId,
+        genre: input.genre,
+        song_title: input.songTitle,
+        song_artist: input.songArtist ?? "",
+        song_id: input.songId ?? null,
       }),
     }),
 
-  dashboard: (eventId = "default") =>
+  dashboard: (eventId: string) =>
     json<DashboardState>(`/api/dashboard?event_id=${encodeURIComponent(eventId)}`),
 
-  setlist: (eventId = "default") =>
-    json<{
-      event_id: string;
-      setlist: SetlistEntry[];
-      upcoming: SetlistEntry[];
-      current_track: Track | null;
-    }>(`/api/setlist?event_id=${encodeURIComponent(eventId)}`),
-
-  /** Import a set. `unmatched` is the half that matters — titles are reported, never guessed. */
-  loadSetlist: (
-    entries: { cue_time?: string; title: string }[],
-    eventId = "default",
-  ) =>
-    json<{ ok: boolean; loaded: number; unmatched: string[]; upcoming: SetlistEntry[] }>(
-      "/api/setlist",
-      { method: "POST", body: JSON.stringify({ entries, event_id: eventId }) },
+  setStatus: (requestId: string, status: RequestStatus, eventId: string) =>
+    json<{ id: string; status: string }>(
+      `/api/requests/${encodeURIComponent(requestId)}/status?event_id=${encodeURIComponent(eventId)}`,
+      { method: "POST", body: JSON.stringify({ status }) },
     ),
-
-  advanceSetlist: (eventId = "default") =>
-    json<{ ok: boolean; dj: DJState }>("/api/setlist/advance", {
-      method: "POST",
-      body: JSON.stringify({ event_id: eventId }),
-    }),
-
-  insertions: (eventId = "default") =>
-    json<{
-      event_id: string;
-      proposals: SlotProposal[];
-      tip_totals: Record<string, number>;
-    }>(`/api/insertions?event_id=${encodeURIComponent(eventId)}`),
-
-  /** Accept a proposal into the set. Does NOT settle the tip — playing does. */
-  acceptInsertion: (
-    trackId: string,
-    position: number,
-    waveId?: string | null,
-    eventId = "default",
-  ) =>
-    json<{ ok: boolean; dj: DJState }>("/api/insertions/accept", {
-      method: "POST",
-      body: JSON.stringify({
-        track_id: trackId,
-        position,
-        wave_id: waveId ?? null,
-        event_id: eventId,
-      }),
-    }),
-
-  tips: (eventId = "default") =>
-    json<{ event_id: string; tips: Tip[]; totals: Record<string, number> }>(
-      `/api/tips?event_id=${encodeURIComponent(eventId)}`,
-    ),
-
-  /** Authorise a tip against one track. Nothing is charged at this point. */
-  createTip: (
-    trackId: string,
-    amountMinor: number,
-    waveId?: string | null,
-    eventId = "default",
-  ) =>
-    json<{ ok: boolean; tip: Tip }>("/api/tips", {
-      method: "POST",
-      body: JSON.stringify({
-        track_id: trackId,
-        amount_minor: amountMinor,
-        wave_id: waveId ?? null,
-        session_id: sessionId(),
-        event_id: eventId,
-      }),
-    }),
-
-  decide: (
-    trackId: string,
-    action: DJAction,
-    waveId?: string | null,
-    eventId = "default",
-  ) =>
-    json<{ ok: boolean; dj: DashboardState["dj"] }>("/api/decisions", {
-      method: "POST",
-      body: JSON.stringify({
-        track_id: trackId,
-        action,
-        wave_id: waveId ?? null,
-        event_id: eventId,
-      }),
-    }),
-
-  search: (q: string, limit = 10) =>
-    json<{ tracks: Track[] }>(
-      `/api/catalog/search?q=${encodeURIComponent(q)}&limit=${limit}`,
-    ),
-
-  stats: (eventId = "default") =>
-    json<EventStats>(`/api/stats?event_id=${encodeURIComponent(eventId)}`),
-
-  seed: (count = 50, eventId = "default", delayMs = 120) =>
-    json<{ ok: boolean; seeded: number }>("/api/demo/seed", {
-      method: "POST",
-      body: JSON.stringify({ count, event_id: eventId, delay_ms: delayMs }),
-    }),
-
-  reset: (eventId = "default") =>
-    json<{ ok: boolean }>("/api/demo/reset", {
-      method: "POST",
-      body: JSON.stringify({ event_id: eventId }),
-    }),
 };
 
 export interface DashboardFeedHandlers {
@@ -205,7 +116,7 @@ export interface DashboardFeedHandlers {
 /**
  * Live dashboard feed with automatic degradation.
  *
- * A blank screen mid-pitch is the worst possible failure, so if the socket
+ * A blank screen mid-set is the worst possible failure, so if the socket
  * cannot be established (or drops), this silently falls back to polling. The
  * caller sees the same onState callbacks either way.
  */

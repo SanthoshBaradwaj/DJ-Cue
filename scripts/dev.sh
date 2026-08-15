@@ -15,10 +15,11 @@ if [ -f "$ROOT/.env" ]; then
   # shellcheck disable=SC1091  # runtime file, not resolvable at lint time
   . "$ROOT/.env"
   set +a
-  if [ -n "${ANTHROPIC_API_KEY:-}" ] || [ -n "${OPENAI_API_KEY:-}" ]; then
-    echo "Loaded .env (LLM key found — enhancement layer will be active)"
+  if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_ANON_KEY:-}" ]; then
+    echo "Loaded .env (Supabase configured)"
   else
-    echo "Loaded .env (no LLM key set — running deterministic-only)"
+    echo "Loaded .env, but SUPABASE_URL / SUPABASE_ANON_KEY are missing — the"
+    echo "backend will fail on first request. Copy .env.example to .env and fill them in."
   fi
 fi
 

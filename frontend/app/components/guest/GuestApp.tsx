@@ -4,91 +4,116 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RequestAck } from "@/lib/types";
 import Confirmation from "./Confirmation";
-import RequestComposer from "./RequestComposer";
-import { prettyEventName } from "./intent";
-import { haptic } from "./motion";
-import { useGuestHistory } from "./useGuestHistory";
+import GenreGrid from "./GenreGrid";
+import SongSearch from "./SongSearch";
+
+type Step = "genre" | "song" | "confirm";
 
 function friendlyError(): string {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return "You're offline — the venue Wi-Fi dipped. Your words are safe.";
+    return "You're offline — the venue Wi-Fi dipped. Try again in a second.";
   }
-  return "Couldn't reach the DJ just then. Your words are safe.";
+  return "Couldn't reach the DJ just then. Try again in a second.";
 }
 
 /**
- * The whole guest surface: one input, one instant validation, one way back.
+ * The whole guest surface: genre grid -> song search -> confirmation.
  *
- * Everything here is client-side — the page has no server data to wait on, and
- * a QR scan should paint before the guest's thumb reaches the screen.
+ * Everything here is client-side so a QR scan paints before the guest's
+ * thumb reaches the screen. The event id comes from the QR's own URL
+ * (`?event=`) when present, and otherwise resolves to whichever event the DJ
+ * most recently started.
  */
 export default function GuestApp() {
-  const [text, setText] = useState("");
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>("genre");
+  const [genre, setGenre] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ack, setAck] = useState<RequestAck | null>(null);
-  const [submittedText, setSubmittedText] = useState("");
-  const [eventName, setEventName] = useState<string | null>(null);
-  // Remounts the composer on "ask again" so autofocus fires a second time.
-  const [round, setRound] = useState(0);
-
-  const { entries, add } = useGuestHistory();
 
   useEffect(() => {
     let alive = true;
+    const fromUrl =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("event")
+        : null;
+    if (fromUrl) {
+      setEventId(fromUrl);
+      return;
+    }
     api
       .config()
       .then((cfg) => {
-        if (alive) setEventName(prettyEventName(cfg.event_id));
+        if (alive) setEventId(cfg.event_id);
       })
       .catch(() => {
-        /* the header is decoration; a missing backend must not block the input */
+        /* resolved lazily on submit if this never lands */
       });
     return () => {
       alive = false;
     };
   }, []);
 
-  const submit = useCallback(async () => {
-    const value = text.trim();
-    if (!value || pending) return;
-
-    haptic(12);
-    setPending(true);
+  const pickGenre = useCallback((key: string) => {
+    setGenre(key);
     setError(null);
-
-    try {
-      const res = await api.submitRequest(value);
-      add({
-        id: res.request_id || `local_${Date.now()}`,
-        text: value,
-        waveLabel: res.wave_label || "",
-        waveSize: res.wave_size || 0,
-        joined: res.joined_existing_wave === true,
-        at: Date.now(),
-      });
-      setSubmittedText(value);
-      setAck(res);
-      setText("");
-      if (typeof window !== "undefined") window.scrollTo({ top: 0 });
-    } catch {
-      // Never surface a raw error to a guest, and never drop what they typed.
-      setError(friendlyError());
-    } finally {
-      setPending(false);
-    }
-  }, [text, pending, add]);
-
-  const askAgain = useCallback(() => {
-    setAck(null);
-    setSubmittedText("");
-    setError(null);
-    setText("");
-    setRound((r) => r + 1);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+    setStep("song");
   }, []);
 
-  const eventLine = eventName ? `${eventName} · live` : "The DJ is listening";
+  const submit = useCallback(
+    async (song: { title: string; artist?: string; songId?: string | null }) => {
+      if (pending || !genre) return;
+      setPending(true);
+      setError(null);
+      try {
+        let resolvedEventId = eventId;
+        if (!resolvedEventId) {
+          const cfg = await api.config();
+          resolvedEventId = cfg.event_id;
+          setEventId(resolvedEventId);
+        }
+        const res = await api.submitRequest({
+          eventId: resolvedEventId,
+          genre,
+          songTitle: song.title,
+          songArtist: song.artist,
+          songId: song.songId,
+        });
+        if (!res.request_id) {
+          setError(res.message || friendlyError());
+          return;
+        }
+        setAck(res);
+        setStep("confirm");
+      } catch {
+        setError(friendlyError());
+      } finally {
+        setPending(false);
+      }
+    },
+    [pending, genre, eventId],
+  );
+
+  const requestAnother = useCallback(() => {
+    setAck(null);
+    setError(null);
+    setStep("song");
+  }, []);
+
+  const changeGenre = useCallback(() => {
+    setAck(null);
+    setError(null);
+    setGenre(null);
+    setStep("genre");
+  }, []);
+
+  const backToGenres = useCallback(() => {
+    setError(null);
+    setStep("genre");
+  }, []);
+
+  const eventLine = eventId ? "Live now" : "Connecting…";
 
   return (
     <main
@@ -100,30 +125,24 @@ export default function GuestApp() {
         paddingRight: "calc(env(safe-area-inset-right) + 1.25rem)",
       }}
     >
-      {/* Persistent live region: the confirmation carries its own, but the
-          composer's pending/failure states need one that already exists in the
-          DOM to be announced at all. */}
       <p className="sr-only" role="status" aria-live="polite">
         {pending ? "Sending your request" : (error ?? "")}
       </p>
 
-      {ack ? (
-        <Confirmation
-          ack={ack}
-          submittedText={submittedText}
-          history={entries}
-          onAskAgain={askAgain}
-        />
-      ) : (
-        <RequestComposer
-          key={round}
-          text={text}
-          onTextChange={setText}
-          onSubmit={submit}
+      {step === "genre" && <GenreGrid eventLine={eventLine} onPick={pickGenre} />}
+
+      {step === "song" && genre && (
+        <SongSearch
+          genreKey={genre}
           pending={pending}
           error={error}
-          eventLine={eventLine}
+          onBack={backToGenres}
+          onSubmit={submit}
         />
+      )}
+
+      {step === "confirm" && ack && (
+        <Confirmation ack={ack} onRequestAnother={requestAnother} onChangeGenre={changeGenre} />
       )}
     </main>
   );

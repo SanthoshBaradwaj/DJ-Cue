@@ -1,19 +1,10 @@
 # ── Secrets ───────────────────────────────────────────────────────────────
-# .env holds a live LLM API key. Never commit it. .env.example is the template
-# that IS committed, so the ignore has to be selective rather than blanket.
+# .env holds live Supabase credentials. Never commit it. .env.example is the
+# template that IS committed, so the ignore has to be selective rather than
+# blanket.
 .env
 .env.*
 !.env.example
-
-# ── Runtime state ─────────────────────────────────────────────────────────
-# SQLite mirror of the in-memory store; regenerated on boot.
-cue.db
-*.db-journal
-backend/cue.db
-
-# Drop-in music the DJ supplies. Keep the directory, never the audio.
-audio/*
-!audio/.gitkeep
 
 # ── Python ────────────────────────────────────────────────────────────────
 __pycache__/
