@@ -65,7 +65,7 @@ class CueService:
             return event_id
         event = self.store.latest_active_event()
         if event is None:
-            event = self.store.create_event("Untitled event")
+            event = self.store.create_event("DJPrashant-PDX")
         return event.id
 
     # -- catalog ----------------------------------------------------------
@@ -78,7 +78,9 @@ class CueService:
     def build_dashboard(self, event_id: str) -> DashboardState:
         requests = self.store.queued_requests(event_id)
         return DashboardState(
-            event_id=event_id, requests=requests, stats=self.store.stats(event_id)
+            event_id=event_id,
+            requests=requests,
+            stats=self.store.stats(event_id, queued=requests),
         )
 
     # -- writes -------------------------------------------------------------

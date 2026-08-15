@@ -17,8 +17,9 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
+import httpx
 from supabase import Client, create_client
 
 from .config import settings
@@ -32,6 +33,26 @@ _SLUG_RE = re.compile(r"[^a-z0-9]+")
 def slugify(name: str) -> str:
     base = _SLUG_RE.sub("-", name.strip().lower()).strip("-")
     return base or "event"
+
+
+def _exec(build: Callable[[], object]):
+    """Run a Supabase query, retrying once on a transient connection drop.
+
+    A warm serverless invocation can hand back a pooled HTTP/2 connection
+    that Supabase's edge silently closed between invocations -- the first
+    request on it fails with an httpx "Server disconnected" error even
+    though nothing about the query itself is wrong (confirmed in production
+    logs: the same query succeeds on retry). `build` constructs a fresh
+    query object each call so there's no question of reusing state from the
+    failed attempt. This deliberately does not catch
+    postgrest.exceptions.APIError -- a real SQL/API error would just fail
+    the same way again, and swallowing it here would hide real bugs.
+    """
+    try:
+        return build().execute()
+    except httpx.TransportError as exc:
+        log.info("transient Supabase connection error, retrying once: %s", exc)
+        return build().execute()
 
 
 def _row_to_event(row: Dict) -> Event:
@@ -90,52 +111,59 @@ class Store:
     def create_event(self, name: str) -> Event:
         name = (name or "").strip() or "Untitled event"
         slug = slugify(name)
-        existing = self.client.table("events").select("slug").execute()
+        existing = _exec(lambda: self.client.table("events").select("slug"))
         taken = {row["slug"] for row in existing.data or []}
         candidate = slug
         suffix = 2
         while candidate in taken:
             candidate = f"{slug}-{suffix}"
             suffix += 1
-        res = (
-            self.client.table("events")
-            .insert({"name": name, "slug": candidate, "status": "active"})
-            .execute()
+        res = _exec(
+            lambda: self.client.table("events").insert(
+                {"name": name, "slug": candidate, "status": "active"}
+            )
         )
         return _row_to_event(res.data[0])
 
     def list_events(self) -> List[Event]:
-        res = self.client.table("events").select("*").order("created_at", desc=True).execute()
+        res = _exec(
+            lambda: self.client.table("events").select("*").order("created_at", desc=True)
+        )
         return [_row_to_event(r) for r in res.data or []]
 
     def get_event(self, event_id: str) -> Optional[Event]:
-        res = self.client.table("events").select("*").eq("id", event_id).limit(1).execute()
+        res = _exec(
+            lambda: self.client.table("events").select("*").eq("id", event_id).limit(1)
+        )
         rows = res.data or []
         return _row_to_event(rows[0]) if rows else None
 
     def latest_active_event(self) -> Optional[Event]:
-        res = (
-            self.client.table("events")
+        res = _exec(
+            lambda: self.client.table("events")
             .select("*")
             .eq("status", "active")
             .order("created_at", desc=True)
             .limit(1)
-            .execute()
         )
         rows = res.data or []
         return _row_to_event(rows[0]) if rows else None
 
     def set_event_status(self, event_id: str, status: str) -> Optional[Event]:
-        res = self.client.table("events").update({"status": status}).eq("id", event_id).execute()
+        res = _exec(
+            lambda: self.client.table("events").update({"status": status}).eq("id", event_id)
+        )
         rows = res.data or []
         return _row_to_event(rows[0]) if rows else None
 
     def set_dj_status(self, event_id: str, dj_status: str) -> Optional[Event]:
         # Same reasoning as set_request_status: RLS grants no direct UPDATE
         # on events.dj_status, so this goes through a validated function.
-        res = self.client.rpc(
-            "set_dj_status", {"p_event_id": event_id, "p_status": dj_status}
-        ).execute()
+        res = _exec(
+            lambda: self.client.rpc(
+                "set_dj_status", {"p_event_id": event_id, "p_status": dj_status}
+            )
+        )
         rows = res.data or []
         if not rows or rows[0] is None or rows[0].get("id") is None:
             return None
@@ -156,20 +184,22 @@ class Store:
         artwork_url: Optional[str] = None,
         bpm: Optional[int] = None,
     ) -> RequestAck:
-        res = self.client.rpc(
-            "submit_song_request",
-            {
-                "p_event_id": event_id,
-                "p_session_id": session_id,
-                "p_song_id": song_id,
-                "p_song_title": song_title,
-                "p_song_artist": song_artist,
-                "p_genre": genre,
-                "p_cooldown_seconds": settings.submit_cooldown_s,
-                "p_artwork_url": artwork_url,
-                "p_bpm": bpm,
-            },
-        ).execute()
+        res = _exec(
+            lambda: self.client.rpc(
+                "submit_song_request",
+                {
+                    "p_event_id": event_id,
+                    "p_session_id": session_id,
+                    "p_song_id": song_id,
+                    "p_song_title": song_title,
+                    "p_song_artist": song_artist,
+                    "p_genre": genre,
+                    "p_cooldown_seconds": settings.submit_cooldown_s,
+                    "p_artwork_url": artwork_url,
+                    "p_bpm": bpm,
+                },
+            )
+        )
         rows = res.data or []
         if not rows:
             return RequestAck(
@@ -212,14 +242,13 @@ class Store:
         )
 
     def queued_requests(self, event_id: str) -> List[SongRequest]:
-        res = (
-            self.client.table("requests")
+        res = _exec(
+            lambda: self.client.table("requests")
             .select("*")
             .eq("event_id", event_id)
             .eq("status", "queued")
             .order("request_count", desc=True)
             .order("created_at")
-            .execute()
         )
         return [_row_to_request(r) for r in res.data or []]
 
@@ -230,10 +259,12 @@ class Store:
         # SECURITY DEFINER function so a status change is always a validated
         # transition, not a raw write anyone holding the anon key could fire
         # at any row with any string.
-        res = self.client.rpc(
-            "set_request_status",
-            {"p_event_id": event_id, "p_request_id": request_id, "p_status": status},
-        ).execute()
+        res = _exec(
+            lambda: self.client.rpc(
+                "set_request_status",
+                {"p_event_id": event_id, "p_request_id": request_id, "p_status": status},
+            )
+        )
         rows = res.data or []
         if not rows or rows[0] is None or rows[0].get("id") is None:
             return None
@@ -244,12 +275,11 @@ class Store:
         proof inserts are actually landing, not just that reads work."""
         started = time.perf_counter()
         try:
-            res = (
-                self.client.table("requests")
+            res = _exec(
+                lambda: self.client.table("requests")
                 .select("created_at", count="exact")
                 .order("created_at", desc=True)
                 .limit(1)
-                .execute()
             )
             latency_ms = (time.perf_counter() - started) * 1000
             rows = res.data or []
@@ -269,18 +299,20 @@ class Store:
         # other mutation, routed through a validated SECURITY DEFINER upsert.
         # The 5-toggle cap is enforced inside that function, not here, so it
         # can't be bypassed by calling PostgREST directly.
-        res = self.client.rpc(
-            "set_pulse_vote",
-            {"p_event_id": event_id, "p_session_id": session_id, "p_status": status},
-        ).execute()
+        res = _exec(
+            lambda: self.client.rpc(
+                "set_pulse_vote",
+                {"p_event_id": event_id, "p_session_id": session_id, "p_status": status},
+            )
+        )
         rows = res.data or []
         if not rows:
             return PulseAck(message="Couldn't reach the DJ just then.")
         row = rows[0]
-        limited = bool(row.get("limited"))
+        limited = bool(row.get("out_limited"))
         return PulseAck(
-            status=row.get("status"),
-            toggle_count=row.get("toggle_count") or 0,
+            status=row.get("out_status"),
+            toggle_count=row.get("out_toggle_count") or 0,
             limited=limited,
             message=(
                 "That's five changes -- we hear you, tough crowd. Locking it in for tonight!"
@@ -289,20 +321,18 @@ class Store:
             ),
         )
 
-    def stats(self, event_id: str) -> EventStats:
-        queued = self.queued_requests(event_id)
-        taps = (
-            self.client.table("request_taps")
-            .select("session_id")
-            .eq("event_id", event_id)
-            .execute()
+    def stats(self, event_id: str, queued: Optional[List[SongRequest]] = None) -> EventStats:
+        # Accepts an already-fetched queued list so a caller that needs both
+        # (build_dashboard does) doesn't pay for the same query twice --
+        # queued_requests() is a real network round trip, not a cache read.
+        if queued is None:
+            queued = self.queued_requests(event_id)
+        taps = _exec(
+            lambda: self.client.table("request_taps").select("session_id").eq("event_id", event_id)
         )
         unique_sessions = len({r["session_id"] for r in (taps.data or [])})
-        pulses = (
-            self.client.table("pulse_votes")
-            .select("status")
-            .eq("event_id", event_id)
-            .execute()
+        pulses = _exec(
+            lambda: self.client.table("pulse_votes").select("status").eq("event_id", event_id)
         )
         pulse_rows = pulses.data or []
         pulse_single = sum(1 for r in pulse_rows if r.get("status") == "single")

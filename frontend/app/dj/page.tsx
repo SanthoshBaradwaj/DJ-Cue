@@ -38,7 +38,7 @@ export default function DJDashboardPage() {
     } else if (list.length > 0) {
       setActiveEventId(list[0].id);
     } else {
-      const created = await api.events.create("Untitled event");
+      const created = await api.events.create("DJPrashant-PDX");
       setEvents([created]);
       setActiveEventId(created.id);
     }

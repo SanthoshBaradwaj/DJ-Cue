@@ -14,8 +14,9 @@ list -- a flaky external API must never take the guest flow down with it.
 from __future__ import annotations
 
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import httpx
 
@@ -126,6 +127,17 @@ def deezer_track_bpm(deezer_track_id: str) -> Optional[int]:
         return None
 
 
+_ARTIST_SPLIT_RE = re.compile(r"[,&/]|\bfeat\.?\b|\bfeaturing\b|\bft\.?\b|\band\b", re.IGNORECASE)
+
+
+def _artist_tokens(artist: str) -> Set[str]:
+    """Split a multi-credit artist string into individual names, so 'A &
+    B' and 'A, B' (or a search result crediting only 'A') can be compared
+    on overlap rather than needing byte-for-byte equality -- real catalogs
+    don't agree on separator punctuation for the exact same recording."""
+    return {p.strip() for p in _ARTIST_SPLIT_RE.split(artist.lower()) if p.strip()}
+
+
 def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
     """Fallback bpm lookup for a song picked from iTunes (or typed by hand)
     rather than matched to a Deezer id directly.
@@ -135,10 +147,11 @@ def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
     Deezer's duplicate gets deduped out) -- restricting bpm lookups to
     `song_id` starting with "deezer:" left real coverage far thinner than
     it needs to be. This still only ever returns Deezer's own measured
-    field, and only when a search result's title AND artist match the
-    request *exactly* (case-insensitively) -- close-but-not-exact matches
-    are skipped rather than guessed, since a wrong match would attach the
-    wrong recording's tempo.
+    field: the title must match the request exactly (case-insensitively --
+    this is the real safeguard against attaching the wrong recording's
+    tempo), and the artist only needs to share at least one credited name
+    with the request, since "A & B" vs "A, B" vs a search result crediting
+    only "A" are all the same recording, just formatted differently.
     """
     title = (title or "").strip()
     artist = (artist or "").strip()
@@ -156,14 +169,15 @@ def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
         return None
 
     norm_title = title.lower()
-    norm_artist = artist.lower()
+    requested_artists = _artist_tokens(artist) if artist else set()
     for row in rows:
         row_title = (row.get("title") or "").strip().lower()
-        row_artist = ((row.get("artist") or {}).get("name") or "").strip().lower()
         if row_title != norm_title:
             continue
-        if norm_artist and row_artist != norm_artist:
-            continue
+        if requested_artists:
+            row_artists = _artist_tokens((row.get("artist") or {}).get("name") or "")
+            if not (requested_artists & row_artists):
+                continue
         track_id = row.get("id")
         if track_id is None:
             continue

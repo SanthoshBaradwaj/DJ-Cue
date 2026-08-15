@@ -52,7 +52,7 @@ class FakeService:
         if event_id:
             return event_id
         if not self.events:
-            return self.create_event("Untitled event").id
+            return self.create_event("DJPrashant-PDX").id
         return self.events[-1].id
 
     def get_event(self, event_id):
