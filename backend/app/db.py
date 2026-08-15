@@ -127,8 +127,8 @@ class Store:
         return _row_to_event(rows[0]) if rows else None
 
     # -- requests ---------------------------------------------------------
-    # Song search lives in app/itunes.py now -- there is no local catalog to
-    # query.
+    # Song search lives in app/catalog_search.py -- there is no local
+    # catalog to query.
 
     def submit_request(
         self,
