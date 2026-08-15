@@ -106,7 +106,10 @@ def search(query: str, genre: Optional[str] = None, limit: int = 8) -> List[Song
     # Both APIs rank by relevance rather than filtering strictly -- neither
     # has a "genre=tamil" parameter -- so folding the genre's display label
     # into the search term is a cheap relevance nudge, not a hard filter.
-    term = f"{query} {genre_label(genre)}" if genre else query
+    # "other" has no genre of its own to bias toward -- appending its label
+    # ("Other genre") would just add noise to the query -- so it searches
+    # unbiased, same as no genre at all.
+    term = f"{query} {genre_label(genre)}" if genre and genre != "other" else query
 
     # Run both requests in parallel rather than doubling latency -- FastAPI
     # already runs this sync route in a worker thread, so a small nested

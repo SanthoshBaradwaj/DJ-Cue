@@ -43,6 +43,12 @@ class CueService:
     def db_health(self) -> DBHealth:
         return self.store.health()
 
+    def set_pulse(self, event_id: str, session_id: str, status: str) -> bool:
+        ok = self.store.set_pulse(event_id, session_id, status)
+        if ok:
+            self.broadcast_state(event_id)
+        return ok
+
     def resolve_event_id(self, event_id: Optional[str]) -> str:
         """An explicit id wins; otherwise fall back to the latest active
         event, creating a first one if none exists yet."""

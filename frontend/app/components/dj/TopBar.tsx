@@ -1,6 +1,7 @@
 "use client";
 
 import type { DJStatus, EventRecord, EventStats } from "@/lib/types";
+import { PulseBar } from "../shared/PulseBar";
 import { DJStatusToggle } from "./DJStatusToggle";
 import type { FeedStatus } from "./useDashboardFeed";
 import EventSwitcher from "./EventSwitcher";
@@ -107,6 +108,9 @@ export function TopBar({
               <MicroStat value={String(stats.total_requests)} label="requests" />
               <MicroStat value={String(stats.unique_songs)} label="songs" />
               <MicroStat value={String(stats.unique_sessions)} label="active users" />
+              {stats.pulse_total > 0 && (
+                <PulseBar single={stats.pulse_single} committed={stats.pulse_committed} />
+              )}
             </div>
           )}
           <div className="hidden sm:block">

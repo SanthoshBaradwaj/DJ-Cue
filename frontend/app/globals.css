@@ -44,6 +44,12 @@
      stays deliberately muted, so red reads as a distinct, rarer warning. */
   --color-danger: #ef4444;
 
+  /* Crowd pulse -- an orthogonal signal from rank/state, so it borrows the
+     pink/purple already latent in the body's ambient glow rather than
+     reusing cue/go/hold/drop and picking up their existing meanings. */
+  --color-pulse-single: #ff2d78;
+  --color-pulse-committed: #a855f7;
+
   --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;

@@ -26,6 +26,10 @@ GENRES = [
     Genre(key="bollywood", label="Bollywood", region="north"),
     Genre(key="english", label="English", region="other"),
     Genre(key="edm", label="EDM / Trap", region="other"),
+    # Catch-all so a guest whose song doesn't fit any bucket above can still
+    # request it, rather than forcing a mistagged pick. Last on purpose --
+    # it's the fallback, not a fifth option worth equal billing.
+    Genre(key="other", label="Other genre", region="other"),
 ]
 
 _BY_KEY = {g.key: g.label for g in GENRES}

@@ -29,8 +29,8 @@ class Event(BaseModel):
     slug: str
     status: str = "active"  # "active" | "ended"
     # The DJ's own availability signal, shown to guests before they spend
-    # time searching: "open" (taking requests), "busy" (mostly locked in,
-    # requests still land but may wait), "closed" (not taking requests).
+    # time searching: "open" (taking requests) or "closed" (not taking
+    # requests -- enforced server-side, not just a display label).
     dj_status: str = "open"
     created_at: float = 0.0
 
@@ -40,7 +40,16 @@ class EventCreate(BaseModel):
 
 
 class DJStatusUpdate(BaseModel):
-    status: str  # "open" | "busy" | "closed"
+    status: str  # "open" | "closed"
+
+
+class PulseUpdate(BaseModel):
+    """Optional, guest-set crowd-pulse signal -- purely informational, never
+    gates anything. One vote per session per event; a repeat call overwrites
+    the guest's own prior vote rather than accumulating."""
+
+    session_id: str
+    status: str  # "single" | "committed"
 
 
 # ---------------------------------------------------------------------------
@@ -137,6 +146,11 @@ class EventStats(BaseModel):
     total_requests: int = 0  # sum of request_count across queued rows
     unique_songs: int = 0  # queued rows
     unique_sessions: int = 0  # distinct devices that have tapped in
+    # Aggregate of the optional guest-set crowd-pulse slider. Never
+    # per-person -- only ever shown as a count/ratio.
+    pulse_single: int = 0
+    pulse_committed: int = 0
+    pulse_total: int = 0
 
 
 class DashboardState(BaseModel):

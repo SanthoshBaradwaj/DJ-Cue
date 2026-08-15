@@ -26,6 +26,7 @@ from .contracts import (
     DashboardState,
     DJStatusUpdate,
     EventCreate,
+    PulseUpdate,
     RequestCreate,
     StatusUpdate,
     WSMessage,
@@ -107,12 +108,23 @@ def create_event(payload: EventCreate):
 
 @app.post("/api/events/{event_id}/status")
 def update_dj_status(event_id: str, payload: DJStatusUpdate):
-    if payload.status not in ("open", "busy", "closed"):
+    if payload.status not in ("open", "closed"):
         return JSONResponse(status_code=422, content={"detail": "unknown dj status"})
     updated = get_service().set_dj_status(event_id, payload.status)
     if updated is None:
         return JSONResponse(status_code=404, content={"detail": "event not found"})
     return updated.model_dump(mode="json")
+
+
+@app.post("/api/events/{event_id}/pulse")
+def update_pulse(event_id: str, payload: PulseUpdate):
+    if payload.status not in ("single", "committed"):
+        return JSONResponse(status_code=422, content={"detail": "unknown pulse status"})
+    session_id = (payload.session_id or "").strip() or ("sess_%s" % uuid.uuid4().hex[:10])
+    ok = get_service().set_pulse(event_id, session_id, payload.status)
+    if not ok:
+        return JSONResponse(status_code=404, content={"detail": "event not found"})
+    return {"ok": True}
 
 
 @app.get("/api/config")

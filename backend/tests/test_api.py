@@ -56,6 +56,9 @@ class FakeService:
     def get_event(self, event_id):
         return next((e for e in self.events if e.id == event_id), None)
 
+    def set_pulse(self, event_id, session_id, status):
+        return any(e.id == event_id for e in self.events)
+
     def search_songs(self, query, genre, limit=8):
         return [
             Song(
@@ -70,6 +73,15 @@ class FakeService:
     def submit_request(
         self, event_id, session_id, song_title, song_artist, genre, song_id, artwork_url=None
     ):
+        event = self.get_event(event_id)
+        if event is not None and event.dj_status == "closed":
+            return RequestAck(
+                request_id=None,
+                song_title=song_title,
+                request_count=0,
+                already_counted=False,
+                message="The DJ isn't taking requests right now -- hang tight!",
+            )
         key = (event_id, song_title.strip().lower(), (song_artist or "").strip().lower())
         existing = self.requests.get(key)
         if existing is None or existing.status != "queued":
@@ -146,7 +158,7 @@ def test_slugify_is_stable_and_never_empty():
 
 def test_genres_cover_the_required_examples():
     keys = {g.key for g in GENRES}
-    assert {"punjabi", "haryanvi", "tamil", "telugu", "marathi", "english", "edm"} <= keys
+    assert {"punjabi", "haryanvi", "tamil", "telugu", "marathi", "english", "edm", "other"} <= keys
 
 
 def test_create_and_list_events(monkeypatch):
@@ -263,11 +275,50 @@ def test_dj_status_toggle(monkeypatch):
     event = client.post("/api/events", json={"name": "Status Test"}).json()
     assert event["dj_status"] == "open"
 
-    res = client.post(f"/api/events/{event['id']}/status", json={"status": "busy"})
+    res = client.post(f"/api/events/{event['id']}/status", json={"status": "closed"})
     assert res.status_code == 200
-    assert res.json()["dj_status"] == "busy"
+    assert res.json()["dj_status"] == "closed"
 
-    bad = client.post(f"/api/events/{event['id']}/status", json={"status": "on-fire"})
+    # "busy" was a real status once -- removing it must actually reject it,
+    # not silently accept it as a no-op.
+    bad = client.post(f"/api/events/{event['id']}/status", json={"status": "busy"})
+    assert bad.status_code == 422
+
+
+def test_closed_dj_status_blocks_requests_with_a_polite_message(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Closed Test"}).json()
+    client.post(f"/api/events/{event['id']}/status", json={"status": "closed"})
+
+    res = client.post(
+        "/api/requests",
+        json={
+            "event_id": event["id"],
+            "session_id": "s1",
+            "genre": "punjabi",
+            "song_title": "Lover",
+        },
+    ).json()
+    assert res["request_id"] is None
+    assert "taking requests" in res["message"].lower()
+
+    dash = client.get("/api/dashboard", params={"event_id": event["id"]}).json()
+    assert dash["requests"] == []
+
+
+def test_pulse_vote_accepted_and_validated(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Pulse Test"}).json()
+
+    ok = client.post(
+        f"/api/events/{event['id']}/pulse", json={"session_id": "s1", "status": "single"}
+    )
+    assert ok.status_code == 200
+    assert ok.json()["ok"] is True
+
+    bad = client.post(
+        f"/api/events/{event['id']}/pulse", json={"session_id": "s1", "status": "married"}
+    )
     assert bad.status_code == 422
 
 

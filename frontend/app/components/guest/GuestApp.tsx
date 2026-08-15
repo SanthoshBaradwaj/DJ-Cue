@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { DJStatus, RequestAck } from "@/lib/types";
+import type { DJStatus, PulseStatus, RequestAck } from "@/lib/types";
 import Confirmation from "./Confirmation";
 import GenreGrid from "./GenreGrid";
 import SongSearch from "./SongSearch";
@@ -32,6 +32,7 @@ export default function GuestApp() {
   const [error, setError] = useState<string | null>(null);
   const [ack, setAck] = useState<RequestAck | null>(null);
   const [djStatus, setDjStatus] = useState<DJStatus | undefined>(undefined);
+  const [pulse, setPulse] = useState<PulseStatus | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -60,6 +61,16 @@ export default function GuestApp() {
     setError(null);
     setStep("song");
   }, []);
+
+  const changePulse = useCallback(
+    (status: PulseStatus) => {
+      setPulse(status);
+      // Optional and non-blocking -- a phone with a dead connection just
+      // doesn't move the aggregate; the guest's own tap already registered.
+      if (eventId) api.events.setPulse(eventId, status).catch(() => undefined);
+    },
+    [eventId],
+  );
 
   const submit = useCallback(
     async (song: {
@@ -136,7 +147,13 @@ export default function GuestApp() {
       </p>
 
       {step === "genre" && (
-        <GenreGrid eventLine={eventLine} djStatus={djStatus} onPick={pickGenre} />
+        <GenreGrid
+          eventLine={eventLine}
+          djStatus={djStatus}
+          pulse={pulse}
+          onPick={pickGenre}
+          onPulseChange={changePulse}
+        />
       )}
 
       {step === "song" && genre && (

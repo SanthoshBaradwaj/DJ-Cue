@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { api, connectDashboard } from "@/lib/api";
 import type { DashboardState } from "@/lib/types";
+import { PulseBar } from "../components/shared/PulseBar";
 
 const ACTIVE_EVENT_KEY = "cue_dj_active_event";
 
@@ -108,6 +109,9 @@ export default function PresentPage() {
                 active users
               </span>
             </div>
+            {stats && stats.pulse_total > 0 && (
+              <PulseBar single={stats.pulse_single} committed={stats.pulse_committed} size="lg" />
+            )}
           </div>
 
           <div>

@@ -54,6 +54,15 @@ played/dismissed, with timestamps) survives for post-event analysis. Events
 are switchable from the top bar, and every request is scoped to one, so
 "Bellevue Aug 21" and next week's gig never mix.
 
+A **Taking requests / Not taking requests** toggle controls whether guests
+can submit at all — flipping to closed is enforced inside the database
+function itself, not just a label, so a guest genuinely cannot get a request
+through while it's on. Every flip is timestamped in `dj_status_log` for a
+timeline of when the floor was open. Guests can also optionally set a
+"single & ready to talk" vs "committed" pulse from a small slider on their
+home screen; the DJ dashboard and presenter screen show the aggregate split
+once anyone has voted — it's a vibe signal, not a request.
+
 ---
 
 ## Setting up Supabase

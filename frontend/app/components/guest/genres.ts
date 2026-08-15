@@ -18,6 +18,10 @@ export const GENRES: Genre[] = [
   { key: "bollywood", label: "Bollywood", region: "north" },
   { key: "english", label: "English", region: "other" },
   { key: "edm", label: "EDM / Trap", region: "other" },
+  // Catch-all so a guest whose song doesn't fit any bucket above can still
+  // request it. Last on purpose -- it's the fallback, not a fifth option
+  // worth equal billing with the rest of the grid.
+  { key: "other", label: "Other genre", region: "other" },
 ];
 
 export function genreLabel(key: string): string {

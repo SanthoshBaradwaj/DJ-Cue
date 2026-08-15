@@ -177,6 +177,14 @@ class Store:
                 message="Couldn't reach the queue -- try again.",
             )
         row = rows[0]
+        if row.get("dj_closed"):
+            return RequestAck(
+                request_id=None,
+                song_title=song_title,
+                request_count=0,
+                already_counted=False,
+                message="The DJ isn't taking requests right now -- hang tight!",
+            )
         if row.get("cooled_down"):
             return RequestAck(
                 request_id=None,
@@ -253,6 +261,15 @@ class Store:
             log.warning("db health check failed: %s", exc)
             return DBHealth(ok=False, error=str(exc))
 
+    def set_pulse(self, event_id: str, session_id: str, status: str) -> bool:
+        # RLS grants no direct write on pulse_votes -- same pattern as every
+        # other mutation, routed through a validated SECURITY DEFINER upsert.
+        res = self.client.rpc(
+            "set_pulse_vote",
+            {"p_event_id": event_id, "p_session_id": session_id, "p_status": status},
+        ).execute()
+        return bool(res.data)
+
     def stats(self, event_id: str) -> EventStats:
         queued = self.queued_requests(event_id)
         taps = (
@@ -262,10 +279,22 @@ class Store:
             .execute()
         )
         unique_sessions = len({r["session_id"] for r in (taps.data or [])})
+        pulses = (
+            self.client.table("pulse_votes")
+            .select("status")
+            .eq("event_id", event_id)
+            .execute()
+        )
+        pulse_rows = pulses.data or []
+        pulse_single = sum(1 for r in pulse_rows if r.get("status") == "single")
+        pulse_committed = sum(1 for r in pulse_rows if r.get("status") == "committed")
         return EventStats(
             total_requests=sum(r.request_count for r in queued),
             unique_songs=len(queued),
             unique_sessions=unique_sessions,
+            pulse_single=pulse_single,
+            pulse_committed=pulse_committed,
+            pulse_total=pulse_single + pulse_committed,
         )
 
 

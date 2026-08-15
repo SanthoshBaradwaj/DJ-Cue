@@ -2,19 +2,20 @@
 
 import type { DJStatus } from "@/lib/types";
 
-const ORDER: DJStatus[] = ["open", "busy", "closed"];
+const ORDER: DJStatus[] = ["open", "closed"];
 
 const COPY: Record<DJStatus, { label: string; color: string }> = {
   open: { label: "Taking requests", color: "var(--color-go)" },
-  busy: { label: "Mostly locked in", color: "var(--color-hold)" },
   closed: { label: "Not taking requests", color: "var(--color-drop)" },
 };
 
 /**
- * One tap cycles open -> busy -> closed -> open. Deliberately a single
- * control with no confirmation step or menu -- this gets tapped between
- * songs, often one-handed, and a DJ (or a very insistent guest who grabbed
- * the tablet) needs it to register on the first touch, not the second.
+ * One tap flips open <-> closed. Deliberately a single control with no
+ * confirmation step or menu -- this gets tapped between songs, often
+ * one-handed, and a DJ (or a very insistent guest who grabbed the tablet)
+ * needs it to register on the first touch, not the second. Flipping to
+ * "closed" is enforced server-side -- guests are blocked from submitting,
+ * not just shown a different label.
  */
 export function DJStatusToggle({
   status,

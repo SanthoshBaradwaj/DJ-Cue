@@ -7,29 +7,46 @@ Do not change any path, field name, or type here without updating every module.
 
 ## Transport
 
-The browser computes the API base at runtime from its own hostname
-(`http://<hostname>:8000`), so a phone that opens `http://192.168.1.5:3000`
-automatically talks to `http://192.168.1.5:8000`. FastAPI enables permissive
-CORS. Use `frontend/lib/api.ts` — never hand-roll a fetch.
+Hosted deployment (the default): frontend and backend deploy as one Vercel
+project via `vercel.json`'s `services` + path `rewrites`
+(`/api/*`, `/ws/*` → backend, everything else → frontend), so a relative
+path is already correct. Local dev: the browser computes the API base from
+its own hostname (`http://<hostname>:8000`) when it detects a LAN address.
+`NEXT_PUBLIC_API_BASE` overrides either. FastAPI enables permissive CORS.
+Use `frontend/lib/api.ts` — never hand-roll a fetch.
 
 ## REST
 
 | Method | Path | Body | Returns |
 | --- | --- | --- | --- |
-| GET | `/api/health` | — | `{ok, supabase, version}` |
-| GET | `/api/config?event_id=` | — | `{event_id, guest_url}` |
+| GET | `/api/health` | — | `{ok, supabase, version, db}` |
+| GET | `/api/config?event_id=` | — | `{event_id, guest_url, dj_status}` |
 | GET | `/api/genres` | — | `{genres: Genre[]}` |
 | GET | `/api/events` | — | `{events: Event[]}` |
 | POST | `/api/events` | `{name}` | `Event` |
+| POST | `/api/events/{id}/status` | `{status}` | `Event` |
+| POST | `/api/events/{id}/pulse` | `{session_id, status}` | `{ok}` |
 | GET | `/api/catalog/search?q=&genre=&limit=` | — | `{songs: Song[]}` |
-| POST | `/api/requests` | `{event_id, session_id, genre, song_title, song_artist?, song_id?}` | `RequestAck` |
+| POST | `/api/requests` | `{event_id, session_id, genre, song_title, song_artist?, song_id?, artwork_url?}` | `RequestAck` |
 | GET | `/api/dashboard?event_id=` | — | `DashboardState` |
 | POST | `/api/requests/{id}/status?event_id=` | `{status}` | `SongRequest` |
 
-`status` is one of `"queued" \| "played" \| "dismissed"`. Setting `played` or
-`dismissed` is a **soft delete** — the row leaves the dashboard's queued list
-but is never removed from the database, so the full lifecycle survives for
-post-event analysis.
+`status` (on requests) is one of `"queued" \| "played" \| "dismissed"`.
+Setting `played` or `dismissed` is a **soft delete** — the row leaves the
+dashboard's queued list but is never removed from the database, so the full
+lifecycle survives for post-event analysis.
+
+`dj_status` on events is `"open" \| "closed"`. Flipping to `"closed"` is
+enforced *inside* `submit_song_request` (see below) — a guest cannot submit
+while closed regardless of what the client does, and gets `RequestAck` back
+with `request_id: null` and a polite `message`. Every flip is also appended
+to `dj_status_log (event_id, status, changed_at)` for a timeline of when the
+DJ opened/closed the floor.
+
+`pulse` status is `"single" \| "committed"` — optional, guest-set, never
+required, aggregated into `EventStats.pulse_single` / `pulse_committed` /
+`pulse_total`. One vote per session per event; voting again overwrites the
+same guest's prior vote.
 
 ## WebSocket
 
@@ -54,17 +71,24 @@ See `frontend/lib/types.ts` — a 1:1 mirror of `backend/app/contracts.py`.
 Key shapes:
 
 ```ts
-Event    { id, name, slug, status, created_at }
-Genre    { key, label, region }              // region: "north" | "south"
-Song     { id, title, artist, genre }
+Event    { id, name, slug, status, dj_status, created_at } // dj_status: "open" | "closed"
+Genre    { key, label, region }              // region: "north" | "south" | "other"
+Song     { id, title, artist, genre, artwork_url }
 SongRequest {
   id, event_id, song_id, song_title, song_artist, genre,
-  request_count, status, created_at, updated_at
+  request_count, status, artwork_url, created_at, updated_at
 }                                              // status: "queued" | "played" | "dismissed"
 RequestAck { request_id, song_title, request_count, already_counted, message }
-EventStats { total_requests, unique_songs, unique_sessions }
+EventStats {
+  total_requests, unique_songs, unique_sessions,
+  pulse_single, pulse_committed, pulse_total
+}
 DashboardState { event_id, requests: SongRequest[], stats: EventStats }
 ```
+
+`GENRES` includes a catch-all `{ key: "other", label: "Other genre" }` for
+songs that don't fit any listed genre — it does not bias the catalog search
+term the way a real genre's label does.
 
 ## Aggregation & anti-spam (server-side, not a client concern)
 

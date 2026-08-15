@@ -1,6 +1,10 @@
 // 1:1 mirror of backend/app/contracts.py. Frozen — see CONTRACT.md.
 
-export type DJStatus = "open" | "busy" | "closed";
+export type DJStatus = "open" | "closed";
+
+/** Optional, guest-set crowd-pulse signal. Purely informational -- never
+ * gates anything, and never shown per-person, only as an aggregate. */
+export type PulseStatus = "single" | "committed";
 
 export interface EventRecord {
   id: string;
@@ -64,6 +68,9 @@ export interface EventStats {
   total_requests: number;
   unique_songs: number;
   unique_sessions: number;
+  pulse_single: number;
+  pulse_committed: number;
+  pulse_total: number;
 }
 
 export interface DashboardState {
