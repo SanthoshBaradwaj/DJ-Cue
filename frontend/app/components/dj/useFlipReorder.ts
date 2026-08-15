@@ -5,10 +5,11 @@ import { useLayoutEffect, useRef, type RefObject } from "react";
 /**
  * FLIP the direct children of `ref` whenever `signature` changes.
  *
- * Waves are re-ranked live while the DJ is looking at them, and a card that
- * teleports to a new position reads as a glitch on stage. Each child opts in
- * with `data-flip-key`; we remember its offset, then play the difference back
- * as a transform so the browser animates the move on the compositor.
+ * Requests are re-ranked live as counts change while the DJ is looking at
+ * the list, and a row that teleports to a new position reads as a glitch.
+ * Each child opts in with `data-flip-key`; we remember its offset, then play
+ * the difference back as a transform so the browser animates the move on the
+ * compositor.
  */
 export function useFlipReorder(
   ref: RefObject<HTMLElement | null>,

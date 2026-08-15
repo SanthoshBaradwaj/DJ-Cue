@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /*
-  CUE design system.
+  DJ-Cue design system.
 
   Two surfaces, one language:
-  - Guest (mobile, in a dark venue, one hand, 10 seconds) — warm, inviting,
+  - Guest (mobile, in a dark venue, one hand, 5 seconds) — warm, inviting,
     generous touch targets, nothing to read.
   - DJ (tablet at arm's length in a dark booth, glanced at between mixes) —
     near-black, high contrast, big numerals, colour used only to rank.
@@ -25,13 +25,10 @@
   --color-mist: #96968e;
   --color-chalk: #f4f3ee;
 
-  /* Wave heat — ONE hue, descending intensity.
-     The previous ramp was pink/purple/blue/cyan: four saturated hues with no
-     ordering. Hue carries no magnitude, so nothing about #a855f7 said "second"
-     — the DJ had to read the numbers to know which wave was biggest, which is
-     the one thing colour should have been doing for him.
-     Ember -> sand -> ash is monotonic, so rank is legible peripherally, and it
-     leaves cool tones free to mean something else entirely (see --color-go). */
+  /* Rank heat — ONE hue, descending intensity. Ember -> sand -> ash is
+     monotonic, so a request's rank on the DJ dashboard is legible
+     peripherally without reading the count, and it leaves cool tones free to
+     mean something else entirely (see --color-go). */
   --color-cue-1: #ff6b35;
   --color-cue-2: #f79246;
   --color-cue-3: #dcb463;
@@ -39,13 +36,10 @@
   --color-cue-5: #61605c;
 
   /* State, not rank. Deliberately the only cool colour in the system, so
-     "this is live" can never be confused with "this wave is hot". */
+     "this is live" can never be confused with "this is a hot request". */
   --color-go: #3ddc97;
   --color-hold: #dcb463;
   --color-drop: #61605c;
-
-  /* Money is its own signal — never reuse a wave colour for it. */
-  --color-tip: #d8c9a3;
 
   --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 

@@ -2,9 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CUE — What does the floor want?",
-  description:
-    "AI song request aggregator for live events. Turns crowd noise into Crowd Waves.",
+  title: "DJ-Cue — Request a song",
+  description: "Scan, pick a genre, request a song. The DJ sees it instantly.",
 };
 
 export const viewport: Viewport = {
