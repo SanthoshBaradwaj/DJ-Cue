@@ -3,7 +3,9 @@
 
 import type {
   DashboardState,
+  DJStatus,
   EventRecord,
+  HealthReport,
   RequestAck,
   RequestStatus,
   Song,
@@ -67,10 +69,10 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  health: () => json<{ ok: boolean; supabase: boolean; version: string }>("/api/health"),
+  health: () => json<HealthReport>("/api/health"),
 
   config: (eventId?: string) =>
-    json<{ event_id: string; guest_url: string }>(
+    json<{ event_id: string; guest_url: string; dj_status: DJStatus }>(
       `/api/config${eventId ? `?event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
 
@@ -78,6 +80,11 @@ export const api = {
     list: () => json<{ events: EventRecord[] }>("/api/events"),
     create: (name: string) =>
       json<EventRecord>("/api/events", { method: "POST", body: JSON.stringify({ name }) }),
+    setDjStatus: (eventId: string, status: DJStatus) =>
+      json<EventRecord>(`/api/events/${encodeURIComponent(eventId)}/status`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      }),
   },
 
   searchSongs: (q: string, genre?: string, limit = 8) =>
@@ -93,6 +100,7 @@ export const api = {
     songTitle: string;
     songArtist?: string;
     songId?: string | null;
+    artworkUrl?: string | null;
   }) =>
     json<RequestAck>("/api/requests", {
       method: "POST",
@@ -103,6 +111,7 @@ export const api = {
         song_title: input.songTitle,
         song_artist: input.songArtist ?? "",
         song_id: input.songId ?? null,
+        artwork_url: input.artworkUrl ?? null,
       }),
     }),
 
@@ -122,12 +131,23 @@ export interface DashboardFeedHandlers {
   onStatus?: (status: "connecting" | "live" | "polling") => void;
 }
 
+/** How often the reliable baseline poll runs, regardless of websocket state. */
+const POLL_INTERVAL_MS = 2500;
+
 /**
- * Live dashboard feed with automatic degradation.
+ * Live dashboard feed with a poll that never stops.
  *
- * A blank screen mid-set is the worst possible failure, so if the socket
- * cannot be established (or drops), this silently falls back to polling. The
- * caller sees the same onState callbacks either way.
+ * The backend can run as more than one instance behind the host's load
+ * balancer, and this app's push channel (an in-process pub/sub -- see
+ * events.py) only reaches whichever instance actually handled a write. A
+ * websocket that happens to land on a *different* instance stays open and
+ * simply never receives that update -- indistinguishable, from the client's
+ * side, from "live." So polling is not a fallback here, it's the floor: it
+ * always runs, every `POLL_INTERVAL_MS`, straight against the database
+ * (the one place guaranteed to be consistent across instances). The
+ * websocket is a pure latency optimization on top -- when it happens to
+ * land on the right instance, updates arrive faster than the next poll
+ * tick; when it doesn't, the poll still catches up within one interval.
  */
 export function connectDashboard(
   eventId: string,
@@ -138,43 +158,31 @@ export function connectDashboard(
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let attempts = 0;
   let closed = false;
+  let live = false;
 
-  const startPolling = () => {
-    if (pollTimer || closed) return;
-    handlers.onStatus?.("polling");
-    const tick = async () => {
-      try {
-        handlers.onState?.(await api.dashboard(eventId));
-      } catch {
-        /* keep trying — the backend may still be booting */
-      }
-    };
-    void tick();
-    pollTimer = setInterval(tick, 3000);
-  };
-
-  const stopPolling = () => {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
+  const poll = async () => {
+    try {
+      handlers.onState?.(await api.dashboard(eventId));
+    } catch {
+      /* keep trying — the backend may still be booting */
     }
   };
 
   const connect = () => {
     if (closed) return;
-    handlers.onStatus?.("connecting");
+    if (!live) handlers.onStatus?.("connecting");
     try {
       socket = new WebSocket(
         `${wsBase()}/ws/dashboard?event_id=${encodeURIComponent(eventId)}`,
       );
     } catch {
-      startPolling();
+      handlers.onStatus?.("polling");
       return;
     }
 
     socket.onopen = () => {
       attempts = 0;
-      stopPolling();
+      live = true;
       handlers.onStatus?.("live");
     };
 
@@ -193,9 +201,9 @@ export function connectDashboard(
     const retry = () => {
       if (closed) return;
       socket = null;
+      live = false;
       attempts += 1;
-      // Degrade to polling quickly rather than staring at a dead screen.
-      if (attempts >= 2) startPolling();
+      handlers.onStatus?.("polling");
       const delay = Math.min(1000 * 2 ** attempts, 10000);
       retryTimer = setTimeout(connect, delay);
     };
@@ -205,15 +213,13 @@ export function connectDashboard(
   };
 
   // Seed immediately so the UI paints before the socket handshake completes.
-  void api
-    .dashboard(eventId)
-    .then((s) => handlers.onState?.(s))
-    .catch(() => undefined);
+  void poll();
+  pollTimer = setInterval(poll, POLL_INTERVAL_MS);
   connect();
 
   return () => {
     closed = true;
-    stopPolling();
+    if (pollTimer) clearInterval(pollTimer);
     if (retryTimer) clearTimeout(retryTimer);
     if (socket) {
       socket.onclose = null;

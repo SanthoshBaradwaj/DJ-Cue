@@ -1,19 +1,20 @@
-"""Live song search: Apple's iTunes Search API, with Deezer as a fallback.
+"""Live song search: Apple's iTunes Search API and Deezer, combined.
 
 Both are free, unauthenticated, no signup -- there is no local song catalog
-and no paid search API anywhere in this path. iTunes is queried first; when
-it comes up thin, Deezer fills in the rest. This exists because iTunes'
-India-storefront coverage is uneven across the genres this app serves --
-excellent for Hindi/Bollywood, Punjabi and Telugu, thinner for Marathi, and
-noticeably weak for Haryanvi (a fast-moving, YouTube-first folk-pop scene
-many small labels never bring to Apple Music at all). Every call is
-short-timeout and fails soft to an empty list -- a flaky external API must
-never take the guest flow down with it.
+and no paid search API anywhere in this path. Earlier this queried Deezer
+only when iTunes came up thin (fewer than 3 hits), but that undercounts the
+common case where iTunes returns a full page of *mediocre* matches -- full
+enough to skip Deezer, but not necessarily the best available results. Both
+sources are now queried on every search, in parallel, and merged -- so a
+better Deezer hit for Haryanvi/Marathi can surface even when iTunes wasn't
+literally empty. Every call is short-timeout and fails soft to an empty
+list -- a flaky external API must never take the guest flow down with it.
 """
 
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
 import httpx
@@ -26,8 +27,6 @@ log = logging.getLogger("cue.catalog_search")
 _ITUNES_URL = "https://itunes.apple.com/search"
 _DEEZER_URL = "https://api.deezer.com/search"
 _TIMEOUT_S = 5.0
-# Below this many iTunes hits, also try Deezer.
-_FALLBACK_THRESHOLD = 3
 
 
 def _search_itunes(term: str, limit: int) -> List[Song]:
@@ -106,18 +105,35 @@ def search(query: str, genre: Optional[str] = None, limit: int = 8) -> List[Song
 
     # Both APIs rank by relevance rather than filtering strictly -- neither
     # has a "genre=tamil" parameter -- so folding the genre's display label
-    # into the search term is a cheap relevance nudge.
+    # into the search term is a cheap relevance nudge, not a hard filter.
     term = f"{query} {genre_label(genre)}" if genre else query
 
-    songs = _search_itunes(term, limit)
-    if len(songs) < _FALLBACK_THRESHOLD:
-        seen = {(s.title.strip().lower(), s.artist.strip().lower()) for s in songs}
-        for song in _search_deezer(term, limit - len(songs)):
+    # Run both requests in parallel rather than doubling latency -- FastAPI
+    # already runs this sync route in a worker thread, so a small nested
+    # pool is cheap and doesn't need an async rewrite of the whole path.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        itunes_future = pool.submit(_search_itunes, term, limit)
+        deezer_future = pool.submit(_search_deezer, term, limit)
+        itunes_songs = itunes_future.result()
+        deezer_songs = deezer_future.result()
+
+    # Interleave rather than "all of A then all of B" -- a strong Deezer hit
+    # for a thin-on-iTunes genre should be able to land above a weak iTunes
+    # match, not get buried after a full page of it.
+    merged: List[Song] = []
+    seen = set()
+    for a, b in zip(itunes_songs, deezer_songs):
+        for song in (a, b):
             key = (song.title.strip().lower(), song.artist.strip().lower())
             if key in seen:
                 continue
             seen.add(key)
-            songs.append(song)
-            if len(songs) >= limit:
-                break
-    return songs
+            merged.append(song)
+    for song in itunes_songs[len(deezer_songs):] + deezer_songs[len(itunes_songs):]:
+        key = (song.title.strip().lower(), song.artist.strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(song)
+
+    return merged[:limit]

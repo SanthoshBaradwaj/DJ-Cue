@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { EventRecord } from "@/lib/types";
+import type { DJStatus, EventRecord } from "@/lib/types";
 import { RequestRow } from "../components/dj/RequestRow";
 import { TopBar } from "../components/dj/TopBar";
 import { useDashboardFeed } from "../components/dj/useDashboardFeed";
@@ -22,6 +22,7 @@ export default function DJDashboardPage() {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [djStatusBusy, setDjStatusBusy] = useState(false);
 
   const loadEvents = useCallback(async (preferId?: string) => {
     const { events: list } = await api.events.list();
@@ -67,6 +68,24 @@ export default function DJDashboardPage() {
     [loadEvents],
   );
 
+  const activeEvent = events.find((e) => e.id === activeEventId) ?? null;
+
+  const onChangeDjStatus = useCallback(
+    (next: DJStatus) => {
+      if (!activeEventId || djStatusBusy) return;
+      setDjStatusBusy(true);
+      // Optimistic: a DJ tapping this between songs needs it to feel instant.
+      setEvents((prev) =>
+        prev.map((e) => (e.id === activeEventId ? { ...e, dj_status: next } : e)),
+      );
+      api.events
+        .setDjStatus(activeEventId, next)
+        .catch(() => loadEvents(activeEventId))
+        .finally(() => setDjStatusBusy(false));
+    },
+    [activeEventId, djStatusBusy, loadEvents],
+  );
+
   const requests = state?.requests ?? [];
   const listRef = useRef<HTMLUListElement>(null);
   useFlipReorder(listRef, requests.map((r) => r.id).join("|"));
@@ -80,6 +99,9 @@ export default function DJDashboardPage() {
         onCreateEvent={onCreateEvent}
         stats={state?.stats ?? null}
         status={status}
+        djStatus={activeEvent?.dj_status ?? null}
+        onChangeDjStatus={onChangeDjStatus}
+        djStatusBusy={djStatusBusy}
       />
 
       {notice && (

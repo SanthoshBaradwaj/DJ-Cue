@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Dict, List, Optional
 
 from supabase import Client, create_client
 
 from .config import settings
-from .contracts import Event, EventStats, RequestAck, SongRequest
+from .contracts import DBHealth, Event, EventStats, RequestAck, SongRequest
 
 log = logging.getLogger("cue.db")
 
@@ -39,6 +40,7 @@ def _row_to_event(row: Dict) -> Event:
         name=row["name"],
         slug=row["slug"],
         status=row.get("status", "active"),
+        dj_status=row.get("dj_status") or "open",
         created_at=_epoch(row.get("created_at")),
     )
 
@@ -53,6 +55,7 @@ def _row_to_request(row: Dict) -> SongRequest:
         genre=row.get("genre") or "",
         request_count=row.get("request_count", 1),
         status=row.get("status", "queued"),
+        artwork_url=row.get("artwork_url"),
         created_at=_epoch(row.get("created_at")),
         updated_at=_epoch(row.get("updated_at")),
     )
@@ -126,6 +129,17 @@ class Store:
         rows = res.data or []
         return _row_to_event(rows[0]) if rows else None
 
+    def set_dj_status(self, event_id: str, dj_status: str) -> Optional[Event]:
+        # Same reasoning as set_request_status: RLS grants no direct UPDATE
+        # on events.dj_status, so this goes through a validated function.
+        res = self.client.rpc(
+            "set_dj_status", {"p_event_id": event_id, "p_status": dj_status}
+        ).execute()
+        rows = res.data or []
+        if not rows or rows[0] is None or rows[0].get("id") is None:
+            return None
+        return self.get_event(event_id)
+
     # -- requests ---------------------------------------------------------
     # Song search lives in app/catalog_search.py -- there is no local
     # catalog to query.
@@ -138,6 +152,7 @@ class Store:
         song_artist: str = "",
         genre: str = "",
         song_id: Optional[str] = None,
+        artwork_url: Optional[str] = None,
     ) -> RequestAck:
         res = self.client.rpc(
             "submit_song_request",
@@ -149,6 +164,7 @@ class Store:
                 "p_song_artist": song_artist,
                 "p_genre": genre,
                 "p_cooldown_seconds": settings.submit_cooldown_s,
+                "p_artwork_url": artwork_url,
             },
         ).execute()
         rows = res.data or []
@@ -172,7 +188,7 @@ class Store:
         already = bool(row.get("already_counted"))
         count = row.get("out_request_count", 1)
         message = (
-            "You've already got this one queued."
+            "Already added — you're on the list, waiting on the DJ."
             if already
             else ("Added to the queue." if count <= 1 else f"Boosted! {count} people want this.")
         )
@@ -211,6 +227,31 @@ class Store:
         if not rows or rows[0] is None or rows[0].get("id") is None:
             return None
         return _row_to_request(rows[0])
+
+    def health(self) -> DBHealth:
+        """A real round trip to Postgres, not just process liveness -- and
+        proof inserts are actually landing, not just that reads work."""
+        started = time.perf_counter()
+        try:
+            res = (
+                self.client.table("requests")
+                .select("created_at", count="exact")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            latency_ms = (time.perf_counter() - started) * 1000
+            rows = res.data or []
+            last_insert = _epoch(rows[0]["created_at"]) if rows else None
+            return DBHealth(
+                ok=True,
+                latency_ms=round(latency_ms, 1),
+                total_requests_all_time=res.count,
+                last_insert_at=last_insert,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            log.warning("db health check failed: %s", exc)
+            return DBHealth(ok=False, error=str(exc))
 
     def stats(self, event_id: str) -> EventStats:
         queued = self.queued_requests(event_id)

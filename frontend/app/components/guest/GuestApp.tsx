@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { RequestAck } from "@/lib/types";
+import type { DJStatus, RequestAck } from "@/lib/types";
 import Confirmation from "./Confirmation";
 import GenreGrid from "./GenreGrid";
 import SongSearch from "./SongSearch";
@@ -31,6 +31,7 @@ export default function GuestApp() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ack, setAck] = useState<RequestAck | null>(null);
+  const [djStatus, setDjStatus] = useState<DJStatus | undefined>(undefined);
 
   useEffect(() => {
     let alive = true;
@@ -38,17 +39,16 @@ export default function GuestApp() {
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("event")
         : null;
-    if (fromUrl) {
-      setEventId(fromUrl);
-      return;
-    }
     api
-      .config()
+      .config(fromUrl ?? undefined)
       .then((cfg) => {
-        if (alive) setEventId(cfg.event_id);
+        if (!alive) return;
+        setEventId(cfg.event_id);
+        setDjStatus(cfg.dj_status);
       })
       .catch(() => {
-        /* resolved lazily on submit if this never lands */
+        if (fromUrl && alive) setEventId(fromUrl);
+        /* dj status stays unknown; resolved lazily on submit if this never lands */
       });
     return () => {
       alive = false;
@@ -62,7 +62,12 @@ export default function GuestApp() {
   }, []);
 
   const submit = useCallback(
-    async (song: { title: string; artist?: string; songId?: string | null }) => {
+    async (song: {
+      title: string;
+      artist?: string;
+      songId?: string | null;
+      artworkUrl?: string | null;
+    }) => {
       if (pending || !genre) return;
       setPending(true);
       setError(null);
@@ -79,6 +84,7 @@ export default function GuestApp() {
           songTitle: song.title,
           songArtist: song.artist,
           songId: song.songId,
+          artworkUrl: song.artworkUrl,
         });
         if (!res.request_id) {
           setError(res.message || friendlyError());
@@ -129,7 +135,9 @@ export default function GuestApp() {
         {pending ? "Sending your request" : (error ?? "")}
       </p>
 
-      {step === "genre" && <GenreGrid eventLine={eventLine} onPick={pickGenre} />}
+      {step === "genre" && (
+        <GenreGrid eventLine={eventLine} djStatus={djStatus} onPick={pickGenre} />
+      )}
 
       {step === "song" && genre && (
         <SongSearch

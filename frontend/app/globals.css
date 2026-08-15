@@ -40,6 +40,9 @@
   --color-go: #3ddc97;
   --color-hold: #dcb463;
   --color-drop: #61605c;
+  /* Destructive-hover only (the Dismiss button) -- everywhere else "drop"
+     stays deliberately muted, so red reads as a distinct, rarer warning. */
+  --color-danger: #ef4444;
 
   --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 

@@ -53,10 +53,23 @@ class FakeService:
             return self.create_event("Untitled event").id
         return self.events[-1].id
 
-    def search_songs(self, query, genre, limit=8):
-        return [Song(id="song_1", title="Lover", artist="Diljit Dosanjh", genre="punjabi")]
+    def get_event(self, event_id):
+        return next((e for e in self.events if e.id == event_id), None)
 
-    def submit_request(self, event_id, session_id, song_title, song_artist, genre, song_id):
+    def search_songs(self, query, genre, limit=8):
+        return [
+            Song(
+                id="song_1",
+                title="Lover",
+                artist="Diljit Dosanjh",
+                genre="punjabi",
+                artwork_url="https://example.com/art.jpg",
+            )
+        ]
+
+    def submit_request(
+        self, event_id, session_id, song_title, song_artist, genre, song_id, artwork_url=None
+    ):
         key = (event_id, song_title.strip().lower(), (song_artist or "").strip().lower())
         existing = self.requests.get(key)
         if existing is None or existing.status != "queued":
@@ -68,6 +81,7 @@ class FakeService:
                 genre=genre,
                 request_count=1,
                 status="queued",
+                artwork_url=artwork_url,
             )
             self.requests[key] = req
             return RequestAck(
@@ -80,6 +94,19 @@ class FakeService:
             request_count=existing.request_count,
             message="Boosted.",
         )
+
+    def set_dj_status(self, event_id, status):
+        for e in self.events:
+            if e.id == event_id:
+                updated = e.model_copy(update={"dj_status": status})
+                self.events[self.events.index(e)] = updated
+                return updated
+        return None
+
+    def db_health(self):
+        from app.contracts import DBHealth
+
+        return DBHealth(ok=True, latency_ms=1.0, total_requests_all_time=len(self.requests))
 
     def build_dashboard(self, event_id):
         rows = [
@@ -119,7 +146,7 @@ def test_slugify_is_stable_and_never_empty():
 
 def test_genres_cover_the_required_examples():
     keys = {g.key for g in GENRES}
-    assert {"punjabi", "haryanvi", "tamil", "telugu"} <= keys
+    assert {"punjabi", "haryanvi", "tamil", "telugu", "marathi", "english", "edm"} <= keys
 
 
 def test_create_and_list_events(monkeypatch):
@@ -211,3 +238,41 @@ def test_empty_song_title_rejected(monkeypatch):
         json={"event_id": event["id"], "session_id": "s1", "genre": "punjabi", "song_title": "  "},
     )
     assert res.status_code == 422
+
+
+def test_artwork_url_is_persisted_on_the_request(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Artwork Test"}).json()
+    res = client.post(
+        "/api/requests",
+        json={
+            "event_id": event["id"],
+            "session_id": "s1",
+            "genre": "telugu",
+            "song_title": "Oo Antava",
+            "artwork_url": "https://example.com/art.jpg",
+        },
+    ).json()
+    dash = client.get("/api/dashboard", params={"event_id": event["id"]}).json()
+    assert dash["requests"][0]["artwork_url"] == "https://example.com/art.jpg"
+    assert res["request_id"] == dash["requests"][0]["id"]
+
+
+def test_dj_status_toggle(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Status Test"}).json()
+    assert event["dj_status"] == "open"
+
+    res = client.post(f"/api/events/{event['id']}/status", json={"status": "busy"})
+    assert res.status_code == 200
+    assert res.json()["dj_status"] == "busy"
+
+    bad = client.post(f"/api/events/{event['id']}/status", json={"status": "on-fire"})
+    assert bad.status_code == 422
+
+
+def test_health_reports_db_status(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    res = client.get("/api/health").json()
+    assert res["ok"] is True
+    assert res["db"]["ok"] is True

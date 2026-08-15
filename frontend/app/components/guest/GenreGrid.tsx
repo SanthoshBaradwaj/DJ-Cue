@@ -1,7 +1,14 @@
 "use client";
 
+import type { DJStatus } from "@/lib/types";
 import { GENRES } from "./genres";
 import { haptic } from "./motion";
+
+const STATUS_COPY: Record<DJStatus, { label: string; dot: string }> = {
+  open: { label: "Taking requests", dot: "bg-go" },
+  busy: { label: "Mostly locked in", dot: "bg-hold" },
+  closed: { label: "Not taking requests", dot: "bg-drop" },
+};
 
 /**
  * Screen 1 of the guest flow: one tap, no typing.
@@ -14,15 +21,19 @@ import { haptic } from "./motion";
  */
 export default function GenreGrid({
   eventLine,
+  djStatus,
   onPick,
 }: {
   eventLine: string;
+  djStatus?: DJStatus;
   onPick: (genreKey: string) => void;
 }) {
   const pick = (key: string) => {
     haptic(12);
     onPick(key);
   };
+
+  const status = djStatus ? STATUS_COPY[djStatus] : null;
 
   return (
     <div className="flex flex-col animate-rise">
@@ -33,18 +44,20 @@ export default function GenreGrid({
         <span className="flex items-center gap-2 text-[13px] text-mist">
           <span
             aria-hidden="true"
-            className="relative flex h-1.5 w-1.5 shrink-0 rounded-full bg-go"
+            className={`relative flex h-1.5 w-1.5 shrink-0 rounded-full ${status?.dot ?? "bg-go"}`}
           >
-            <span className="absolute -inset-1 rounded-full bg-go/40 animate-pulse-ring" />
+            {(!status || status === STATUS_COPY.open) && (
+              <span className="absolute -inset-1 rounded-full bg-go/40 animate-pulse-ring" />
+            )}
           </span>
-          <span className="truncate">{eventLine}</span>
+          <span className="truncate">{status ? status.label : eventLine}</span>
         </span>
       </header>
 
       <h1 className="mt-7 text-[28px] leading-[1.15] font-semibold tracking-[-0.02em] text-chalk">
-        What&apos;s your sound tonight?
+        Request your favourites
       </h1>
-      <p className="mt-2 text-[15px] text-mist">Pick a genre to request a song.</p>
+      <p className="mt-2 text-[15px] text-mist">Pick a genre to get started.</p>
 
       <div className="mt-7 grid grid-cols-2 gap-3">
         {GENRES.map((g, i) => (
@@ -54,8 +67,8 @@ export default function GenreGrid({
             onClick={() => pick(g.key)}
             style={{ animationDelay: `${60 + i * 45}ms`, animationFillMode: "backwards" }}
             className={`tap flex h-24 flex-col items-center justify-center gap-1 rounded-2xl border border-ink-line bg-ink-card/80 px-3 text-center transition-all duration-150 active:scale-[0.96] active:border-cue-1/60 active:bg-cue-1/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70 animate-rise ${
-              // 5 genres in a 2-column grid leaves one odd item; give it the
-              // full row rather than letting it sit lopsided next to a gap.
+              // An odd genre count in a 2-column grid leaves one item without
+              // a partner; give it the full row rather than a lopsided gap.
               GENRES.length % 2 === 1 && i === GENRES.length - 1 ? "col-span-2" : ""
             }`}
           >

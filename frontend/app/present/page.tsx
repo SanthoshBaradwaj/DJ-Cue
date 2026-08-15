@@ -105,7 +105,7 @@ export default function PresentPage() {
                 {stats?.unique_sessions ?? 0}
               </span>
               <span className="mt-1 block text-sm uppercase tracking-[0.2em] text-[var(--color-mist)]">
-                phones in
+                active users
               </span>
             </div>
           </div>
@@ -122,6 +122,18 @@ export default function PresentPage() {
                   <span className="tnum w-10 shrink-0 text-right text-xl font-bold" style={{ color: "var(--color-cue-1)" }}>
                     {r.request_count}×
                   </span>
+                  {r.artwork_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- arbitrary remote CDN host, not worth next/image config
+                    <img
+                      src={r.artwork_url}
+                      alt=""
+                      width={40}
+                      height={40}
+                      className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <span className="h-10 w-10 shrink-0 rounded-lg bg-[var(--color-ink-line)]" aria-hidden="true" />
+                  )}
                   <span className="truncate text-lg font-medium">{r.song_title}</span>
                 </li>
               ))}

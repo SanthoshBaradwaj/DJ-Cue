@@ -22,7 +22,14 @@ from fastapi.responses import JSONResponse
 
 from .api.service import get_service
 from .config import settings
-from .contracts import DashboardState, EventCreate, RequestCreate, StatusUpdate, WSMessage
+from .contracts import (
+    DashboardState,
+    DJStatusUpdate,
+    EventCreate,
+    RequestCreate,
+    StatusUpdate,
+    WSMessage,
+)
 from .events import bus
 from .genres import GENRES
 
@@ -31,7 +38,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("cue")
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 
 @asynccontextmanager
@@ -69,7 +76,13 @@ def lan_ip() -> str:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "supabase": settings.has_supabase, "version": VERSION}
+    db = get_service().db_health()
+    return {
+        "ok": db.ok,
+        "supabase": settings.has_supabase,
+        "version": VERSION,
+        "db": db.model_dump(mode="json"),
+    }
 
 
 @app.get("/api/genres")
@@ -92,11 +105,26 @@ def create_event(payload: EventCreate):
     return event.model_dump(mode="json")
 
 
+@app.post("/api/events/{event_id}/status")
+def update_dj_status(event_id: str, payload: DJStatusUpdate):
+    if payload.status not in ("open", "busy", "closed"):
+        return JSONResponse(status_code=422, content={"detail": "unknown dj status"})
+    updated = get_service().set_dj_status(event_id, payload.status)
+    if updated is None:
+        return JSONResponse(status_code=404, content={"detail": "event not found"})
+    return updated.model_dump(mode="json")
+
+
 @app.get("/api/config")
 def config(event_id: Optional[str] = Query(default=None)):
     resolved = get_service().resolve_event_id(event_id)
+    event = get_service().get_event(resolved)
     guest_url = settings.public_url or ("http://%s:3000" % lan_ip())
-    return {"event_id": resolved, "guest_url": "%s/?event=%s" % (guest_url, resolved)}
+    return {
+        "event_id": resolved,
+        "guest_url": "%s/?event=%s" % (guest_url, resolved),
+        "dj_status": event.dj_status if event else "open",
+    }
 
 
 @app.get("/api/catalog/search")
@@ -121,6 +149,7 @@ def create_request(payload: RequestCreate):
         song_artist=(payload.song_artist or "").strip()[:200],
         genre=(payload.genre or "").strip(),
         song_id=payload.song_id,
+        artwork_url=payload.artwork_url,
     )
     return ack.model_dump(mode="json")
 

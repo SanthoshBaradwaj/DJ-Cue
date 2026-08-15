@@ -12,7 +12,7 @@ import logging
 from typing import List, Optional
 
 from .. import catalog_search
-from ..contracts import DashboardState, Event, RequestAck, Song, SongRequest, WSMessage
+from ..contracts import DashboardState, DBHealth, Event, RequestAck, Song, SongRequest, WSMessage
 from ..db import get_store
 from ..events import bus
 
@@ -30,6 +30,18 @@ class CueService:
 
     def list_events(self) -> List[Event]:
         return self.store.list_events()
+
+    def get_event(self, event_id: str) -> Optional[Event]:
+        return self.store.get_event(event_id)
+
+    def set_dj_status(self, event_id: str, status: str) -> Optional[Event]:
+        updated = self.store.set_dj_status(event_id, status)
+        if updated is not None:
+            self.broadcast_state(event_id)
+        return updated
+
+    def db_health(self) -> DBHealth:
+        return self.store.health()
 
     def resolve_event_id(self, event_id: Optional[str]) -> str:
         """An explicit id wins; otherwise fall back to the latest active
@@ -64,6 +76,7 @@ class CueService:
         song_artist: str,
         genre: str,
         song_id: Optional[str],
+        artwork_url: Optional[str] = None,
     ) -> RequestAck:
         ack = self.store.submit_request(
             event_id=event_id,
@@ -72,6 +85,7 @@ class CueService:
             song_artist=song_artist,
             genre=genre,
             song_id=song_id,
+            artwork_url=artwork_url,
         )
         if ack.request_id:
             bus.publish(

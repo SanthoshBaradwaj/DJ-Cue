@@ -1,6 +1,7 @@
 "use client";
 
-import type { EventRecord, EventStats } from "@/lib/types";
+import type { DJStatus, EventRecord, EventStats } from "@/lib/types";
+import { DJStatusToggle } from "./DJStatusToggle";
 import type { FeedStatus } from "./useDashboardFeed";
 import EventSwitcher from "./EventSwitcher";
 
@@ -50,6 +51,9 @@ export function TopBar({
   onCreateEvent,
   stats,
   status,
+  djStatus,
+  onChangeDjStatus,
+  djStatusBusy,
 }: {
   events: EventRecord[];
   activeEventId: string | null;
@@ -57,6 +61,9 @@ export function TopBar({
   onCreateEvent: (name: string) => void;
   stats: EventStats | null;
   status: FeedStatus;
+  djStatus: DJStatus | null;
+  onChangeDjStatus: (next: DJStatus) => void;
+  djStatusBusy?: boolean;
 }) {
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-ink-line/80 bg-ink/85 backdrop-blur-xl">
@@ -79,13 +86,19 @@ export function TopBar({
           </div>
         </div>
 
-        {/* Block 2: event switcher, full width on mobile. */}
-        <EventSwitcher
-          events={events}
-          activeEventId={activeEventId}
-          onSelect={onSelectEvent}
-          onCreate={onCreateEvent}
-        />
+        {/* Block 2: event switcher + guest-facing availability, full width
+            on mobile, side by side once horizontal. */}
+        <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+          <EventSwitcher
+            events={events}
+            activeEventId={activeEventId}
+            onSelect={onSelectEvent}
+            onCreate={onCreateEvent}
+          />
+          {djStatus && (
+            <DJStatusToggle status={djStatus} onChange={onChangeDjStatus} busy={djStatusBusy} />
+          )}
+        </div>
 
         {/* Block 3: stats + status, pinned right once horizontal. */}
         <div className="flex items-center justify-between gap-4 sm:ml-auto sm:justify-end sm:gap-5">
@@ -93,7 +106,7 @@ export function TopBar({
             <div className="flex items-center gap-4 sm:gap-5">
               <MicroStat value={String(stats.total_requests)} label="requests" />
               <MicroStat value={String(stats.unique_songs)} label="songs" />
-              <MicroStat value={String(stats.unique_sessions)} label="phones" />
+              <MicroStat value={String(stats.unique_sessions)} label="active users" />
             </div>
           )}
           <div className="hidden sm:block">

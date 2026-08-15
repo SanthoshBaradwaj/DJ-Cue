@@ -28,11 +28,19 @@ class Event(BaseModel):
     name: str
     slug: str
     status: str = "active"  # "active" | "ended"
+    # The DJ's own availability signal, shown to guests before they spend
+    # time searching: "open" (taking requests), "busy" (mostly locked in,
+    # requests still land but may wait), "closed" (not taking requests).
+    dj_status: str = "open"
     created_at: float = 0.0
 
 
 class EventCreate(BaseModel):
     name: str
+
+
+class DJStatusUpdate(BaseModel):
+    status: str  # "open" | "busy" | "closed"
 
 
 # ---------------------------------------------------------------------------
@@ -43,7 +51,7 @@ class EventCreate(BaseModel):
 class Genre(BaseModel):
     key: str
     label: str
-    region: str  # "north" | "south"
+    region: str  # "north" | "south" | "other"
 
 
 class Song(BaseModel):
@@ -76,6 +84,7 @@ class SongRequest(BaseModel):
     # soft delete -- it flips this field, never removes the row -- so the
     # full lifecycle survives for post-event analysis.
     status: str = "queued"
+    artwork_url: Optional[str] = None
     created_at: float = 0.0
     updated_at: float = 0.0
 
@@ -87,6 +96,7 @@ class RequestCreate(BaseModel):
     song_title: str
     song_artist: str = ""
     song_id: Optional[str] = None
+    artwork_url: Optional[str] = None
 
 
 class RequestAck(BaseModel):
@@ -102,6 +112,20 @@ class RequestAck(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: str  # "played" | "dismissed"
+
+
+# ---------------------------------------------------------------------------
+# Health -- /api/health reports whether the database is actually reachable
+# and taking writes, not just whether the process is up.
+# ---------------------------------------------------------------------------
+
+
+class DBHealth(BaseModel):
+    ok: bool
+    latency_ms: Optional[float] = None
+    total_requests_all_time: Optional[int] = None
+    last_insert_at: Optional[float] = None
+    error: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

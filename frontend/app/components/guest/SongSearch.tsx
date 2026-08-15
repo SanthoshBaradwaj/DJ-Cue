@@ -26,7 +26,12 @@ export default function SongSearch({
   pending: boolean;
   error: string | null;
   onBack: () => void;
-  onSubmit: (song: { title: string; artist?: string; songId?: string | null }) => void;
+  onSubmit: (song: {
+    title: string;
+    artist?: string;
+    songId?: string | null;
+    artworkUrl?: string | null;
+  }) => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Song[]>([]);
@@ -64,7 +69,12 @@ export default function SongSearch({
 
   const pickSong = (song: Song) => {
     haptic(12);
-    onSubmit({ title: song.title, artist: song.artist, songId: song.id });
+    onSubmit({
+      title: song.title,
+      artist: song.artist,
+      songId: song.id,
+      artworkUrl: song.artwork_url,
+    });
   };
 
   const requestTyped = () => {

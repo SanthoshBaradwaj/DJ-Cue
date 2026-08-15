@@ -14,7 +14,10 @@ export const GENRES: Genre[] = [
   { key: "tamil", label: "Tamil", region: "south" },
   { key: "haryanvi", label: "Haryanvi", region: "north" },
   { key: "telugu", label: "Telugu", region: "south" },
+  { key: "marathi", label: "Marathi", region: "other" },
   { key: "bollywood", label: "Bollywood", region: "north" },
+  { key: "english", label: "English", region: "other" },
+  { key: "edm", label: "EDM / Trap", region: "other" },
 ];
 
 export function genreLabel(key: string): string {

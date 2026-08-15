@@ -12,15 +12,20 @@ from typing import Optional
 
 from .contracts import Genre
 
-# Interleaved north/south, matching frontend/app/components/guest/genres.ts
-# -- the guest grid never groups by region, so the data it's built from
-# shouldn't imply a grouping either.
+# Interleaved rather than grouped, matching
+# frontend/app/components/guest/genres.ts -- the guest grid never clusters
+# by region, so the data it's built from shouldn't imply a grouping either.
+# "region" is informational only (never rendered) -- "other" covers genres
+# that aren't a North/South India regional language at all.
 GENRES = [
     Genre(key="punjabi", label="Punjabi", region="north"),
     Genre(key="tamil", label="Tamil", region="south"),
     Genre(key="haryanvi", label="Haryanvi", region="north"),
     Genre(key="telugu", label="Telugu", region="south"),
+    Genre(key="marathi", label="Marathi", region="other"),
     Genre(key="bollywood", label="Bollywood", region="north"),
+    Genre(key="english", label="English", region="other"),
+    Genre(key="edm", label="EDM / Trap", region="other"),
 ]
 
 _BY_KEY = {g.key: g.label for g in GENRES}
