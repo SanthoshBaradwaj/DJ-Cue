@@ -46,31 +46,32 @@ export default function GenreGrid({
 
   return (
     <div className="flex flex-col animate-rise">
-      <header className="flex items-baseline justify-between gap-3">
-        <span className="bg-gradient-to-r from-cue-1 via-cue-2 to-cue-3 bg-clip-text text-[15px] font-bold tracking-[0.42em] text-transparent">
+      <header className="flex items-center justify-between gap-3">
+        <span className="shrink-0 bg-gradient-to-r from-cue-1 via-cue-2 to-cue-3 bg-clip-text text-[15px] font-bold tracking-[0.42em] text-transparent">
           DJ-CUE
         </span>
-        <span className="flex items-center gap-2 text-[13px] text-mist">
-          <span
-            aria-hidden="true"
-            className={`relative flex h-1.5 w-1.5 shrink-0 rounded-full ${status?.dot ?? "bg-go"}`}
-          >
-            {(!status || status === STATUS_COPY.open) && (
-              <span className="absolute -inset-1 rounded-full bg-go/40 animate-pulse-ring" />
-            )}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex min-w-0 items-center gap-2 text-[13px] text-mist">
+            <span
+              aria-hidden="true"
+              className={`relative flex h-1.5 w-1.5 shrink-0 rounded-full ${status?.dot ?? "bg-go"}`}
+            >
+              {(!status || status === STATUS_COPY.open) && (
+                <span className="absolute -inset-1 rounded-full bg-go/40 animate-pulse-ring" />
+              )}
+            </span>
+            <span className="truncate">{status ? status.label : eventLine}</span>
           </span>
-          <span className="truncate">{status ? status.label : eventLine}</span>
-        </span>
+          {onPulseChange && (
+            <PulseToggle
+              value={pulse ?? null}
+              limited={Boolean(pulseLimited)}
+              pending={Boolean(pulsePending)}
+              onChange={onPulseChange}
+            />
+          )}
+        </div>
       </header>
-
-      {onPulseChange && (
-        <PulseToggle
-          value={pulse ?? null}
-          limited={Boolean(pulseLimited)}
-          pending={Boolean(pulsePending)}
-          onChange={onPulseChange}
-        />
-      )}
 
       {closed ? (
         <div className="mt-10 flex flex-col items-center gap-2 rounded-2xl border border-ink-line bg-ink-card/60 px-6 py-10 text-center">
