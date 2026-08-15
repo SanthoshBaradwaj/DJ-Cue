@@ -152,6 +152,15 @@ def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
     tempo), and the artist only needs to share at least one credited name
     with the request, since "A & B" vs "A, B" vs a search result crediting
     only "A" are all the same recording, just formatted differently.
+
+    Deezer's catalog often carries several entries for what's really the
+    same recording -- the single, an album cut, a video edition -- and only
+    some of those have actually been through Deezer's own tempo analysis.
+    Committing to whichever matching entry happened to rank first left real
+    hits (confirmed in production logs on a major, definitely-analysed
+    single) resolving to a candidate with no bpm even though a sibling
+    entry in the same result set had one. So every matching candidate is
+    tried, in Deezer's own ranked order, until one actually has data.
     """
     title = (title or "").strip()
     artist = (artist or "").strip()
@@ -181,7 +190,11 @@ def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
         track_id = row.get("id")
         if track_id is None:
             continue
-        return deezer_track_bpm(str(track_id))
+        bpm = deezer_track_bpm(str(track_id))
+        if bpm:
+            return bpm
+        # This particular matching entry just wasn't analysed -- keep
+        # checking the other candidates before giving up.
     return None
 
 
