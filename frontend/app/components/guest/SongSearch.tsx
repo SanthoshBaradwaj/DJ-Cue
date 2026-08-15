@@ -136,9 +136,30 @@ export default function SongSearch({
                   type="button"
                   disabled={pending}
                   onClick={() => pickSong(song)}
-                  className="tap flex w-full items-center justify-between gap-3 rounded-2xl border border-ink-line bg-ink-card/80 px-4 py-3.5 text-left transition-all duration-150 active:scale-[0.985] active:border-cue-1/60 active:bg-cue-1/10 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+                  className="tap flex w-full items-center gap-3 rounded-2xl border border-ink-line bg-ink-card/80 px-3 py-3 text-left transition-all duration-150 active:scale-[0.985] active:border-cue-1/60 active:bg-cue-1/10 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
                 >
-                  <span className="min-w-0">
+                  {song.artwork_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- arbitrary remote CDN host, not worth next/image config
+                    <img
+                      src={song.artwork_url}
+                      alt=""
+                      width={48}
+                      height={48}
+                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-ink-line text-mist"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                        <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.6" fill="none" />
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.6" fill="none" />
+                      </svg>
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
                     <span className="block truncate text-[16px] font-semibold text-chalk">
                       {song.title}
                     </span>

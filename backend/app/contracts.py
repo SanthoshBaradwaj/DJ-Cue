@@ -47,10 +47,15 @@ class Genre(BaseModel):
 
 
 class Song(BaseModel):
+    """A search result from the iTunes Search API -- ``id`` is an iTunes
+    track id, not a row in our own database. There is no local catalog
+    anymore; this is whatever Apple's music catalog returns in real time."""
+
     id: str
     title: str
     artist: str = ""
-    genre: str
+    genre: str = ""
+    artwork_url: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

@@ -14,11 +14,14 @@ export interface Genre {
   region: "north" | "south";
 }
 
+/** A search result from the iTunes Search API -- `id` is an iTunes track id,
+ * not a row in our own database. There is no local catalog anymore. */
 export interface Song {
   id: string;
   title: string;
   artist: string;
   genre: string;
+  artwork_url: string | null;
 }
 
 export type RequestStatus = "queued" | "played" | "dismissed";

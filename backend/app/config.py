@@ -12,6 +12,21 @@ import os
 from typing import Optional
 
 
+# Fallback Supabase project for the hosted deployment. The anon/publishable
+# key is *meant* to be public -- Supabase's own docs say so -- it is rate
+# limited and every table it can touch sits behind the RLS policies applied
+# in the schema migration, the same trust boundary as this API's wide-open
+# CORS. Baking it in means `./scripts/dev.sh` and a from-scratch Vercel
+# deploy both work with zero env-var setup; SUPABASE_URL / SUPABASE_ANON_KEY
+# still override it for anyone pointing at their own project.
+_FALLBACK_SUPABASE_URL = "https://tzgvqffgndsntptylpbq.supabase.co"
+_FALLBACK_SUPABASE_ANON_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6Z3ZxZmZnbmRzbnRwdHlscGJxIiwicm9sZSI6ImFub24iLCJpYXQi"
+    "OjE3ODY3NTEyMjIsImV4cCI6MjEwMjMyNzIyMn0.3yttF43VxVIJi1VQD_jbuJE2p0V9p_hzG6xTSDvSkyE"
+)
+
+
 class Settings:
     # --- server ---
     host: str = os.environ.get("CUE_HOST", "0.0.0.0")
@@ -22,13 +37,15 @@ class Settings:
     public_url: Optional[str] = os.environ.get("CUE_PUBLIC_URL")
 
     # --- Supabase (system of record) ---
-    supabase_url: Optional[str] = os.environ.get("SUPABASE_URL")
-    # The anon/publishable key. There are no user accounts in this product --
-    # guests are anonymous session ids and the DJ dashboard has no login --
-    # so the backend talks to Supabase the same way a trusted client would,
-    # with RLS policies scoped to what this app actually needs.
-    supabase_key: Optional[str] = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get(
-        "SUPABASE_KEY"
+    supabase_url: Optional[str] = os.environ.get("SUPABASE_URL") or _FALLBACK_SUPABASE_URL
+    # There are no user accounts in this product -- guests are anonymous
+    # session ids and the DJ dashboard has no login -- so the backend talks
+    # to Supabase the same way a trusted client would, with RLS policies
+    # scoped to what this app actually needs.
+    supabase_key: Optional[str] = (
+        os.environ.get("SUPABASE_ANON_KEY")
+        or os.environ.get("SUPABASE_KEY")
+        or _FALLBACK_SUPABASE_ANON_KEY
     )
 
     # --- anti-spam ---

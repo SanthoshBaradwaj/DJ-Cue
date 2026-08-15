@@ -1,9 +1,11 @@
 # DJ-Cue backend. Supabase is the system of record -- there is no local
-# fallback store, so SUPABASE_URL / SUPABASE_ANON_KEY must be set.
+# fallback store, so SUPABASE_URL / SUPABASE_ANON_KEY must be set. Song
+# search hits the iTunes Search API directly (httpx) -- no local catalog.
 fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.5
 supabase>=2.6
+httpx>=0.24
 
 # Dev
 pytest>=7.0

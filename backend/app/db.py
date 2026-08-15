@@ -21,7 +21,7 @@ from typing import Dict, List, Optional
 from supabase import Client, create_client
 
 from .config import settings
-from .contracts import Event, EventStats, RequestAck, Song, SongRequest
+from .contracts import Event, EventStats, RequestAck, SongRequest
 
 log = logging.getLogger("cue.db")
 
@@ -40,12 +40,6 @@ def _row_to_event(row: Dict) -> Event:
         slug=row["slug"],
         status=row.get("status", "active"),
         created_at=_epoch(row.get("created_at")),
-    )
-
-
-def _row_to_song(row: Dict) -> Song:
-    return Song(
-        id=row["id"], title=row["title"], artist=row.get("artist") or "", genre=row["genre"]
     )
 
 
@@ -132,27 +126,9 @@ class Store:
         rows = res.data or []
         return _row_to_event(rows[0]) if rows else None
 
-    # -- catalog --------------------------------------------------------
-
-    def search_songs(
-        self, query: str = "", genre: Optional[str] = None, limit: int = 8
-    ) -> List[Song]:
-        q = self.client.table("songs").select("*")
-        if genre:
-            q = q.eq("genre", genre)
-        query = (query or "").strip()
-        if query:
-            safe = query.replace("%", "").replace(",", "").replace("*", "")
-            q = q.or_(f"title.ilike.%{safe}%,artist.ilike.%{safe}%")
-        res = q.order("title").limit(limit).execute()
-        return [_row_to_song(r) for r in res.data or []]
-
-    def get_song(self, song_id: str) -> Optional[Song]:
-        res = self.client.table("songs").select("*").eq("id", song_id).limit(1).execute()
-        rows = res.data or []
-        return _row_to_song(rows[0]) if rows else None
-
     # -- requests ---------------------------------------------------------
+    # Song search lives in app/itunes.py now -- there is no local catalog to
+    # query.
 
     def submit_request(
         self,
