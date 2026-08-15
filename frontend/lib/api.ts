@@ -10,12 +10,6 @@ import type {
   WSMessage,
 } from "./types";
 
-// The hosted backend this frontend talks to by default -- set once, after
-// the backend project is deployed. NEXT_PUBLIC_API_BASE always overrides it,
-// so pointing at a different backend later is a Vercel env var, not a
-// redeploy of this file.
-const HOSTED_API_BASE = "https://dj-cue-api.vercel.app";
-
 const LAN_HOST_RE = /^(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})$/;
 
 /**
@@ -25,17 +19,19 @@ const LAN_HOST_RE = /^(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{
  * - Laptop-on-venue-wifi: frontend and backend run on the same machine, one
  *   port apart. A phone that opens http://192.168.1.5:3000 talks to
  *   http://192.168.1.5:8000 with zero configuration.
- * - Hosted: frontend and backend are two separate deployments on different
- *   domains, so there is no port to guess -- HOSTED_API_BASE is the answer.
- * NEXT_PUBLIC_API_BASE overrides either, for anyone running their own backend.
+ * - Hosted (the default here): frontend and backend deploy as one Vercel
+ *   project via vercel.json's `services` + path `rewrites`
+ *   (/api/*, /ws/* -> backend, everything else -> frontend), so they share
+ *   one domain and a relative path is already correct -- base is "".
+ * NEXT_PUBLIC_API_BASE overrides either, for a backend on its own domain.
  */
 export function apiBase(): string {
   const override = process.env.NEXT_PUBLIC_API_BASE;
-  if (override) return override.replace(/\/$/, "");
-  if (typeof window === "undefined") return HOSTED_API_BASE;
+  if (override !== undefined) return override.replace(/\/$/, "");
+  if (typeof window === "undefined") return "";
   const { protocol, hostname } = window.location;
   if (LAN_HOST_RE.test(hostname)) return `${protocol}//${hostname}:8000`;
-  return HOSTED_API_BASE;
+  return "";
 }
 
 export function wsBase(): string {
