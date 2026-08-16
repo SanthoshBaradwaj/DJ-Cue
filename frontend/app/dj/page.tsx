@@ -58,16 +58,6 @@ export default function DJDashboardPage() {
 
   const { state, status, notice, setRequestStatus } = useDashboardFeed(activeEventId);
 
-  const onCreateEvent = useCallback(
-    (name: string) => {
-      api
-        .events.create(name)
-        .then((created) => loadEvents(created.id))
-        .catch(() => undefined);
-    },
-    [loadEvents],
-  );
-
   const activeEvent = events.find((e) => e.id === activeEventId) ?? null;
 
   const onChangeDjStatus = useCallback(
@@ -96,7 +86,6 @@ export default function DJDashboardPage() {
         events={events}
         activeEventId={activeEventId}
         onSelectEvent={setActiveEventId}
-        onCreateEvent={onCreateEvent}
         stats={state?.stats ?? null}
         status={status}
         djStatus={activeEvent?.dj_status ?? null}

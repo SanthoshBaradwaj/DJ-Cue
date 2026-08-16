@@ -49,7 +49,6 @@ export function TopBar({
   events,
   activeEventId,
   onSelectEvent,
-  onCreateEvent,
   stats,
   status,
   djStatus,
@@ -59,7 +58,6 @@ export function TopBar({
   events: EventRecord[];
   activeEventId: string | null;
   onSelectEvent: (id: string) => void;
-  onCreateEvent: (name: string) => void;
   stats: EventStats | null;
   status: FeedStatus;
   djStatus: DJStatus | null;
@@ -90,12 +88,7 @@ export function TopBar({
         {/* Block 2: event switcher + guest-facing availability, full width
             on mobile, side by side once horizontal. */}
         <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-          <EventSwitcher
-            events={events}
-            activeEventId={activeEventId}
-            onSelect={onSelectEvent}
-            onCreate={onCreateEvent}
-          />
+          <EventSwitcher events={events} activeEventId={activeEventId} onSelect={onSelectEvent} />
           {djStatus && (
             <DJStatusToggle status={djStatus} onChange={onChangeDjStatus} busy={djStatusBusy} />
           )}
