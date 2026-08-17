@@ -41,11 +41,12 @@ export default function PulseChoice({
   };
 
   return (
-    <div className="mt-5">
+    <div className="mt-6">
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-mist">Tap your vibe</p>
       <div
         role="group"
         aria-label="Crowd pulse: single or committed"
-        className="flex overflow-hidden rounded-full border border-ink-line bg-ink-card/60 p-1"
+        className="mt-2 flex gap-2"
       >
         {(["single", "committed"] as PulseStatus[]).map((opt) => {
           const active = value === opt;
@@ -56,14 +57,18 @@ export default function PulseChoice({
               onClick={() => pick(opt)}
               disabled={pending}
               aria-pressed={active}
-              className="tap flex-1 rounded-full px-3 py-3 text-[14px] font-semibold transition-all duration-150 ease-out disabled:opacity-60"
+              className="tap flex flex-1 items-center justify-center gap-2 rounded-2xl border px-3 py-3.5 text-[13.5px] font-semibold leading-snug transition-all duration-150 ease-out active:scale-[0.97] disabled:opacity-60"
               style={{
-                color: active ? COLOR[opt] : "var(--color-mist)",
-                background: active
-                  ? `color-mix(in oklab, ${COLOR[opt]} 16%, transparent)`
-                  : "transparent",
+                borderColor: `color-mix(in oklab, ${COLOR[opt]} ${active ? 55 : 32}%, var(--color-ink-line))`,
+                background: `color-mix(in oklab, ${COLOR[opt]} ${active ? 20 : 9}%, var(--color-ink-card))`,
+                color: active ? COLOR[opt] : "var(--color-chalk)",
               }}
             >
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: COLOR[opt] }}
+              />
               {LABEL[opt]}
             </button>
           );
