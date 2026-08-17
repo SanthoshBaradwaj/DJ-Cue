@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import type { DJStatus, PulseStatus } from "@/lib/types";
 import { GENRES, genreColor } from "./genres";
 import { haptic } from "./motion";
+import PulseChoice from "./PulseChoice";
 import PulseToggle from "./PulseToggle";
 
 const STATUS_COPY: Record<DJStatus, { label: string; dot: string }> = {
@@ -73,6 +74,15 @@ export default function GenreGrid({
           )}
         </div>
       </header>
+
+      {onPulseChange && (
+        <PulseChoice
+          value={pulse ?? null}
+          limited={Boolean(pulseLimited)}
+          pending={Boolean(pulsePending)}
+          onChange={onPulseChange}
+        />
+      )}
 
       {closed ? (
         <div className="mt-10 flex flex-col items-center gap-2 rounded-2xl border border-ink-line bg-ink-card/60 px-6 py-10 text-center">
