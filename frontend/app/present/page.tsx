@@ -58,7 +58,11 @@ export default function PresentPage() {
   }, [eventId]);
 
   const stats = state?.stats;
-  const top = (state?.requests ?? []).slice(0, 6);
+  // Full ranked queue, not a top-N slice -- the stat above already tells
+  // guests how many requests exist, so a list that quietly drops the rest
+  // reads as a bug, not curation. The page already scrolls (min-h-dvh, no
+  // overflow trap), so there's nothing else to change to make this reachable.
+  const top = state?.requests ?? [];
 
   return (
     <main className="min-h-dvh p-5 sm:p-8 lg:p-12 flex flex-col gap-6 sm:gap-8 overflow-x-hidden">
