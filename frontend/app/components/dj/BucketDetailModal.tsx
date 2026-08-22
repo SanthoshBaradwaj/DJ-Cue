@@ -87,13 +87,13 @@ export function BucketDetailModal({
         </div>
 
         <dl className="mt-5 grid grid-cols-2 gap-3">
-          <Field label="Album" value={request.album ?? "—"} />
-          <Field label="BPM" value={request.bpm ? String(request.bpm) : "—"} />
+          <Field label="Album" value={request.album} />
+          <Field label="BPM" value={request.bpm ? String(request.bpm) : null} />
           <Field
             label="Vote count"
             value={`${request.request_count} request${request.request_count === 1 ? "" : "s"}`}
           />
-          <Field label="Release date" value={request.release_date ?? "—"} />
+          <Field label="Release date" value={request.release_date} />
         </dl>
 
         <div className="mt-6 flex gap-2.5">
@@ -123,11 +123,24 @@ export function BucketDetailModal({
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value }: { label: string; value: string | null }) {
+  // A bare dash next to real data reads as broken, not "we don't have
+  // this" -- a source (usually Deezer, for a track too new or too niche to
+  // be in its catalog) genuinely not having a field is expected often
+  // enough that it needs to look deliberate, not like a rendering bug.
+  const known = value != null && value !== "";
   return (
     <div>
       <dt className="text-[11px] font-medium uppercase tracking-[0.1em] text-mist/60">{label}</dt>
-      <dd className="mt-0.5 truncate text-[15px] font-medium text-chalk">{value}</dd>
+      <dd
+        className={
+          known
+            ? "mt-0.5 truncate text-[15px] font-medium text-chalk"
+            : "mt-0.5 truncate text-[15px] font-medium text-mist/50 italic"
+        }
+      >
+        {known ? value : "Not available"}
+      </dd>
     </div>
   );
 }

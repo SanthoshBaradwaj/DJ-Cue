@@ -218,7 +218,7 @@ export default function SongSearch({
       </div>
 
       {actionLimited ? (
-        <p role="alert" className="mt-3 rounded-xl border border-ink-line bg-ink-card/80 px-4 py-3 text-[14px] text-mist animate-rise">
+        <p role="alert" className="mt-3 rounded-xl bg-cue-1 px-4 py-3 text-[14px] font-semibold text-ink animate-rise">
           {error || "You've used up your requests for tonight -- thanks for playing along!"}
         </p>
       ) : error ? (
