@@ -5,6 +5,8 @@ import type {
   DashboardState,
   DJStatus,
   EventRecord,
+  EventSettings,
+  FirstTimeAnswerAck,
   HealthReport,
   PulseAck,
   PulseStatus,
@@ -74,7 +76,7 @@ export const api = {
   health: () => json<HealthReport>("/api/health"),
 
   config: (eventId?: string) =>
-    json<{ event_id: string; guest_url: string; dj_status: DJStatus }>(
+    json<{ event_id: string; guest_url: string; dj_status: DJStatus; settings: EventSettings }>(
       `/api/config${eventId ? `?event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
 
@@ -128,6 +130,12 @@ export const api = {
 
   dashboard: (eventId: string) =>
     json<DashboardState>(`/api/dashboard?event_id=${encodeURIComponent(eventId)}`),
+
+  firstTimeAnswer: (eventId: string, answer: "yes" | "no") =>
+    json<FirstTimeAnswerAck>("/api/first-time-answer", {
+      method: "POST",
+      body: JSON.stringify({ event_id: eventId, session_id: sessionId(), answer }),
+    }),
 
   setStatus: (requestId: string, status: RequestStatus, eventId: string) =>
     json<{ id: string; status: string }>(

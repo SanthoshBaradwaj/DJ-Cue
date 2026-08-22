@@ -23,7 +23,15 @@ import httpx
 from supabase import Client, create_client
 
 from .config import settings
-from .contracts import DBHealth, Event, EventStats, PulseAck, RequestAck, SongRequest
+from .contracts import (
+    DBHealth,
+    Event,
+    EventStats,
+    FirstTimeAnswerAck,
+    PulseAck,
+    RequestAck,
+    SongRequest,
+)
 
 log = logging.getLogger("cue.db")
 
@@ -236,6 +244,15 @@ class Store:
                 already_counted=True,
                 message="Give it a second -- your last request is still landing.",
             )
+        if row.get("action_limited"):
+            return RequestAck(
+                request_id=None,
+                song_title=song_title,
+                request_count=0,
+                already_counted=False,
+                action_limited=True,
+                message="You've used up your requests for tonight -- thanks for playing along!",
+            )
         already = bool(row.get("already_counted"))
         count = row.get("out_request_count", 1)
         message = (
@@ -329,6 +346,27 @@ class Store:
                 if limited
                 else None
             ),
+        )
+
+    def record_first_time_answer(
+        self, event_id: str, session_id: str, answer: str
+    ) -> FirstTimeAnswerAck:
+        # RLS grants no direct write on first_time_answers -- same pattern
+        # as every other mutation, routed through a validated SECURITY
+        # DEFINER function that also enforces the yes/no answer domain.
+        res = _exec(
+            lambda: self.client.rpc(
+                "record_first_time_answer",
+                {"p_event_id": event_id, "p_session_id": session_id, "p_answer": answer},
+            )
+        )
+        rows = res.data or []
+        if not rows:
+            return FirstTimeAnswerAck()
+        row = rows[0]
+        return FirstTimeAnswerAck(
+            answer=row.get("out_answer"),
+            already_answered=bool(row.get("out_already_answered")),
         )
 
     def stats(self, event_id: str, queued: Optional[List[SongRequest]] = None) -> EventStats:

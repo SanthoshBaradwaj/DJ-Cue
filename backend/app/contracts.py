@@ -87,6 +87,26 @@ class PulseUpdate(BaseModel):
     status: str  # "single" | "committed"
 
 
+class FirstTimeAnswerCreate(BaseModel):
+    """Guest's reply to the config-gated "Is this your first time?" modal.
+    Only "yes"/"no" ever reach the backend -- the modal's third button,
+    "Already Answered", is a pure client-side dismiss for a guest who
+    remembers answering earlier, and never calls this at all."""
+
+    event_id: str
+    session_id: str
+    answer: str  # "yes" | "no"
+
+
+class FirstTimeAnswerAck(BaseModel):
+    answer: Optional[str] = None
+    # True when this session had already recorded an answer before this
+    # call -- the original answer is returned either way, unchanged, so a
+    # repeat call (the modal firing twice on a slow reconnect, say) is
+    # always safe to make and never double-counts in analysis.
+    already_answered: bool = False
+
+
 class PulseAck(BaseModel):
     # None only when the event/session round trip itself failed -- the
     # guest's own vote never gets silently dropped otherwise.
@@ -187,6 +207,11 @@ class RequestAck(BaseModel):
     # (or is inside the submit cooldown) -- the tap still feels acknowledged,
     # it just didn't move the number.
     already_counted: bool = False
+    # True when this session has spent its configured request/upvote budget
+    # (events.settings.max_actions_per_session) -- always False for an event
+    # that hasn't set one. Broken out like PulseAck.limited so the guest UI
+    # can gate further taps instead of just reading the message string.
+    action_limited: bool = False
     message: str
 
 
@@ -213,6 +238,16 @@ class DBHealth(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class GenreBucketView(BaseModel):
+    """One rendered column of a DJ's genre-quota chart. `requests` is
+    always exactly `slots` long -- a `None` entry is an explicitly empty
+    slot (that genre's backlog ran dry), never just omitted, so the
+    dashboard can show the gap instead of silently collapsing it."""
+
+    label: str
+    requests: List[Optional[SongRequest]]
+
+
 class EventStats(BaseModel):
     total_requests: int = 0  # sum of request_count across queued rows
     unique_songs: int = 0  # queued rows
@@ -228,6 +263,12 @@ class DashboardState(BaseModel):
     event_id: str
     requests: List[SongRequest] = Field(default_factory=list)
     stats: EventStats = Field(default_factory=EventStats)
+    # Only populated when the event has genre_buckets configured -- the flat
+    # `requests` list above stays fully populated regardless, so a request
+    # whose genre matches no configured bucket is never invisible on any
+    # surface. None (not []) means "this event has no bucket chart" -- an
+    # unconfigured event renders exactly like the app always has.
+    buckets: Optional[List[GenreBucketView]] = None
 
 
 class WSMessage(BaseModel):

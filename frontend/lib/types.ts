@@ -108,7 +108,21 @@ export interface RequestAck {
    * submit cooldown) — the tap still feels acknowledged, it just didn't move
    * the number. */
   already_counted: boolean;
+  /** True once this session has spent its configured request/upvote budget
+   * (settings.max_actions_per_session) — always false when an event hasn't
+   * set one. */
+  action_limited: boolean;
   message: string;
+}
+
+/** Guest's reply to the config-gated "Is this your first time?" modal. Only
+ * "yes"/"no" ever reach the backend — the modal's third button, "Already
+ * Answered", is a pure client-side dismiss that never calls the API. */
+export interface FirstTimeAnswerAck {
+  answer: "yes" | "no" | null;
+  /** True when this session had already recorded an answer before this
+   * call — the original answer is returned either way, unchanged. */
+  already_answered: boolean;
 }
 
 export interface EventStats {
@@ -120,10 +134,22 @@ export interface EventStats {
   pulse_total: number;
 }
 
+/** One rendered column of a DJ's genre-quota chart. `requests` is always
+ * exactly `slots` long -- a `null` entry is an explicitly empty slot (that
+ * genre's backlog ran dry), never just omitted. */
+export interface GenreBucketView {
+  label: string;
+  requests: (SongRequest | null)[];
+}
+
 export interface DashboardState {
   event_id: string;
   requests: SongRequest[];
   stats: EventStats;
+  /** Only populated when the event has genre_buckets configured -- `null`
+   * means "no bucket chart", so the dashboard falls back to the flat
+   * `requests` list above, exactly like the app always has. */
+  buckets: GenreBucketView[] | null;
 }
 
 export interface DBHealth {

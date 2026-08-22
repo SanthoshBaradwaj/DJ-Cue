@@ -18,6 +18,7 @@ from app.contracts import (  # noqa: E402
     DashboardState,
     Event,
     EventStats,
+    FirstTimeAnswerAck,
     PulseAck,
     RequestAck,
     Song,
@@ -34,6 +35,7 @@ class FakeService:
         self.events = []
         self.requests = {}
         self.pulse_votes = {}
+        self.first_time_answers = {}
         self._next = 1
 
     def _id(self, prefix):
@@ -159,6 +161,14 @@ class FakeService:
                 unique_sessions=0,
             ),
         )
+
+    def record_first_time_answer(self, event_id, session_id, answer):
+        key = (event_id, session_id)
+        existing = self.first_time_answers.get(key)
+        if existing is not None:
+            return FirstTimeAnswerAck(answer=existing, already_answered=True)
+        self.first_time_answers[key] = answer
+        return FirstTimeAnswerAck(answer=answer, already_answered=False)
 
     def set_request_status(self, event_id, request_id, status):
         for r in self.requests.values():
@@ -382,3 +392,37 @@ def test_health_reports_db_status(monkeypatch):
     res = client.get("/api/health").json()
     assert res["ok"] is True
     assert res["db"]["ok"] is True
+
+
+def test_config_exposes_event_settings_with_defaults(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    res = client.get("/api/config").json()
+    # An event that never configured anything ships the all-defaults shape --
+    # no special-casing needed on the frontend for "unconfigured".
+    assert res["settings"]["genre_buckets"] == []
+    assert res["settings"]["max_actions_per_session"] is None
+    assert res["settings"]["allow_cross_genre_backfill"] is False
+
+
+def test_first_time_answer_rejects_anything_but_yes_or_no(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "FTA Test"}).json()
+    res = client.post(
+        "/api/first-time-answer",
+        json={"event_id": event["id"], "session_id": "s1", "answer": "already_answered"},
+    )
+    assert res.status_code == 422
+
+
+def test_first_time_answer_is_idempotent_per_session(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "FTA Idempotent Test"}).json()
+    body = {"event_id": event["id"], "session_id": "s1", "answer": "yes"}
+
+    first = client.post("/api/first-time-answer", json=body).json()
+    assert first == {"answer": "yes", "already_answered": False}
+
+    # Same session answering again (e.g. the modal firing twice) doesn't
+    # overwrite the original answer, even with a different choice.
+    second = client.post("/api/first-time-answer", json=dict(body, answer="no")).json()
+    assert second == {"answer": "yes", "already_answered": True}

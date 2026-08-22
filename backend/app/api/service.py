@@ -9,13 +9,17 @@ every connected DJ dashboard over the websocket.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from datetime import date
+from typing import List, Optional, Tuple
 
 from .. import catalog_search
 from ..contracts import (
     DashboardState,
     DBHealth,
     Event,
+    EventSettings,
+    FirstTimeAnswerAck,
+    GenreBucketView,
     PulseAck,
     RequestAck,
     Song,
@@ -26,6 +30,46 @@ from ..db import get_store
 from ..events import bus
 
 log = logging.getLogger("cue.service")
+
+
+def _release_date_ordinal(value: Optional[str]) -> Optional[int]:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value[:10]).toordinal()
+    except (ValueError, TypeError):
+        return None
+
+
+def _bucket_sort_key(req: SongRequest, rank_order: List[str]) -> Tuple:
+    """Build a tuple sort key implementing the configured rank hierarchy.
+
+    Each field contributes ``(is_missing, -value)`` -- ascending sort on
+    that pair puts present values before missing ones (missing always sorts
+    last, regardless of direction) and higher values first among the
+    present ones. Sorting on the combined tuple applies the fields in
+    priority order, each one only breaking ties left by the ones before it.
+    An unrecognised field name (a future DJ's typo, or a rank axis this
+    build doesn't know yet) is skipped rather than raising, so a bad config
+    value degrades to "rank by whatever's left" instead of crashing the
+    dashboard.
+    """
+    parts: List[Tuple[int, float]] = []
+    for field in rank_order:
+        if field == "votes":
+            parts.append((0, -req.request_count))
+        elif field == "popularity":
+            if req.popularity is None:
+                parts.append((1, 0.0))
+            else:
+                parts.append((0, -req.popularity))
+        elif field == "release_date":
+            ordinal = _release_date_ordinal(req.release_date)
+            if ordinal is None:
+                parts.append((1, 0.0))
+            else:
+                parts.append((0, -ordinal))
+    return tuple(parts)
 
 
 class CueService:
@@ -58,6 +102,11 @@ class CueService:
             self.broadcast_state(event_id)
         return ack
 
+    def record_first_time_answer(
+        self, event_id: str, session_id: str, answer: str
+    ) -> FirstTimeAnswerAck:
+        return self.store.record_first_time_answer(event_id, session_id, answer)
+
     def resolve_event_id(self, event_id: Optional[str]) -> str:
         """An explicit id wins; otherwise fall back to the latest active
         event, creating a first one if none exists yet."""
@@ -77,11 +126,65 @@ class CueService:
 
     def build_dashboard(self, event_id: str) -> DashboardState:
         requests = self.store.queued_requests(event_id)
+        event = self.store.get_event(event_id)
+        buckets = (
+            self._build_buckets(requests, event.settings)
+            if event and event.settings.genre_buckets
+            else None
+        )
         return DashboardState(
             event_id=event_id,
             requests=requests,
             stats=self.store.stats(event_id, queued=requests),
+            buckets=buckets,
         )
+
+    def _build_buckets(
+        self, requests: List[SongRequest], event_settings: EventSettings
+    ) -> List[GenreBucketView]:
+        """Slot the flat request list into the DJ's configured genre chart.
+
+        Every bucket only draws from requests no earlier bucket has already
+        claimed, so a genre listed in two buckets (a future DJ's config,
+        never DJ Prashant's) still can't seat the same song twice. Backfill
+        is a second pass, strictly after every bucket has had first pick of
+        its own genres, so a deliberate genre split never gets crowded out
+        by a louder bucket's overflow -- it only reaches into a slot no
+        genre-matched song could fill.
+        """
+        rank_order = event_settings.chart_rank_order or ["votes"]
+
+        def sort_key(req: SongRequest) -> Tuple:
+            return _bucket_sort_key(req, rank_order)
+
+        used_ids = set()
+        picks: List[List[SongRequest]] = []
+        for bucket in event_settings.genre_buckets:
+            matched = sorted(
+                (r for r in requests if r.genre in bucket.genres and r.id not in used_ids),
+                key=sort_key,
+            )
+            chosen = matched[: bucket.slots]
+            used_ids.update(r.id for r in chosen)
+            picks.append(chosen)
+
+        if event_settings.allow_cross_genre_backfill:
+            leftover = sorted((r for r in requests if r.id not in used_ids), key=sort_key)
+            for bucket, chosen in zip(event_settings.genre_buckets, picks):
+                need = bucket.slots - len(chosen)
+                if need <= 0:
+                    continue
+                fill, leftover = leftover[:need], leftover[need:]
+                chosen.extend(fill)
+                used_ids.update(r.id for r in fill)
+
+        return [
+            GenreBucketView(
+                label=bucket.label,
+                requests=chosen + [None] * (bucket.slots - len(chosen)),
+            )
+            for bucket, chosen in zip(event_settings.genre_buckets, picks)
+        ]
 
     # -- writes -------------------------------------------------------------
 

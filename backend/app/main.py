@@ -26,6 +26,8 @@ from .contracts import (
     DashboardState,
     DJStatusUpdate,
     EventCreate,
+    EventSettings,
+    FirstTimeAnswerCreate,
     PulseUpdate,
     RequestCreate,
     StatusUpdate,
@@ -159,6 +161,11 @@ def config(request: Request, event_id: Optional[str] = Query(default=None)):
         "event_id": resolved,
         "guest_url": "%s/?event=%s" % (guest_url, resolved),
         "dj_status": event.dj_status if event else "open",
+        # Entirely opt-in per-event customization -- see contracts.EventSettings.
+        # An event that never set any of this ships the all-defaults shape,
+        # so the guest UI degrades to today's exact behaviour with no
+        # special-casing on the frontend for "no settings configured".
+        "settings": (event.settings if event else EventSettings()).model_dump(mode="json"),
     }
 
 
@@ -188,6 +195,18 @@ def create_request(payload: RequestCreate):
         album=payload.album,
         popularity=payload.popularity,
     )
+    return ack.model_dump(mode="json")
+
+
+@app.post("/api/first-time-answer")
+def first_time_answer(payload: FirstTimeAnswerCreate):
+    if payload.answer not in ("yes", "no"):
+        return JSONResponse(
+            status_code=422, content={"detail": "answer must be 'yes' or 'no'"}
+        )
+    session_id = (payload.session_id or "").strip() or ("sess_%s" % uuid.uuid4().hex[:10])
+    event_id = get_service().resolve_event_id(payload.event_id)
+    ack = get_service().record_first_time_answer(event_id, session_id, payload.answer)
     return ack.model_dump(mode="json")
 
 
