@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { DJStatus, EventRecord } from "@/lib/types";
+import { BucketBoard } from "../components/dj/BucketBoard";
 import { RequestRow } from "../components/dj/RequestRow";
 import { TopBar } from "../components/dj/TopBar";
 import { useDashboardFeed } from "../components/dj/useDashboardFeed";
@@ -77,6 +78,9 @@ export default function DJDashboardPage() {
   );
 
   const requests = state?.requests ?? [];
+  // Only present once the event has genre_buckets configured -- every other
+  // event (today's default) keeps the plain ranked list below.
+  const buckets = state?.buckets ?? null;
   const listRef = useRef<HTMLUListElement>(null);
   useFlipReorder(listRef, requests.map((r) => r.id).join("|"));
 
@@ -103,9 +107,15 @@ export default function DJDashboardPage() {
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 xl:px-8 xl:py-7">
-        <div className="mx-auto w-full max-w-2xl">
+        <div className={buckets && buckets.length > 0 ? "mx-auto w-full" : "mx-auto w-full max-w-2xl"}>
           {loadingEvents || !state ? (
             <WaitingForTheRoom connected={Boolean(state)} />
+          ) : buckets && buckets.length > 0 ? (
+            <BucketBoard
+              buckets={buckets}
+              onPlayed={(id) => setRequestStatus(id, "played")}
+              onDismiss={(id) => setRequestStatus(id, "dismissed")}
+            />
           ) : requests.length > 0 ? (
             <ul ref={listRef} className="flex flex-col gap-3">
               {requests.map((request, i) => (

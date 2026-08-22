@@ -47,9 +47,23 @@ export function useDashboardFeed(eventId: string | null) {
       if (!eventId) return;
       // Fold the row out of the list immediately; the next "state" push
       // confirms it, but a DJ tapping a 48px button mid-set must never
-      // wonder if it registered.
+      // wonder if it registered. On the bucket board this means the slot
+      // goes blank right away -- the backend's own dynamic replacement
+      // (promoting the next-ranked backlog song into that slot) arrives on
+      // the next push shortly after, same as it always does server-side.
       setState((prev) =>
-        prev ? { ...prev, requests: prev.requests.filter((r) => r.id !== requestId) } : prev,
+        prev
+          ? {
+              ...prev,
+              requests: prev.requests.filter((r) => r.id !== requestId),
+              buckets: prev.buckets
+                ? prev.buckets.map((b) => ({
+                    ...b,
+                    requests: b.requests.map((r) => (r?.id === requestId ? null : r)),
+                  }))
+                : prev.buckets,
+            }
+          : prev,
       );
       try {
         await api.setStatus(requestId, next, eventId);
