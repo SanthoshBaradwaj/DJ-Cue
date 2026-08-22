@@ -94,6 +94,8 @@ class CueService:
         genre: str,
         song_id: Optional[str],
         artwork_url: Optional[str] = None,
+        album: Optional[str] = None,
+        popularity: Optional[int] = None,
     ) -> RequestAck:
         # Real BPM, resolved once here rather than at search time. A direct
         # Deezer id gives an exact track; anything else (an iTunes match --
@@ -101,11 +103,25 @@ class CueService:
         # a typed "request it anyway") falls back to a strict title+artist
         # Deezer lookup so bpm still gets a real shot at resolving instead
         # of being permanently unreachable for the majority of requests.
-        bpm = None
+        #
+        # release_date follows the exact same two-path resolution as bpm --
+        # always from Deezer, never client-supplied, so both fields share
+        # one predictable story instead of iTunes and Deezer dates mixing
+        # formats. popularity, by contrast, already travelled with the
+        # search result the guest tapped (same trust level as artwork_url)
+        # -- only backfilled here when that came back empty, e.g. an
+        # iTunes-won pick that never carried a Deezer rank at all.
         if song_id and song_id.startswith("deezer:"):
-            bpm = catalog_search.deezer_track_bpm(song_id.split(":", 1)[1])
+            deezer_id = song_id.split(":", 1)[1]
+            bpm = catalog_search.deezer_track_bpm(deezer_id)
+            detail = catalog_search.deezer_track_metadata(deezer_id)
         else:
             bpm = catalog_search.deezer_bpm_by_title_artist(song_title, song_artist)
+            detail = catalog_search.deezer_metadata_by_title_artist(song_title, song_artist)
+        release_date = detail.get("release_date")
+        if popularity is None:
+            popularity = detail.get("popularity")
+
         ack = self.store.submit_request(
             event_id=event_id,
             session_id=session_id,
@@ -115,6 +131,9 @@ class CueService:
             song_id=song_id,
             artwork_url=artwork_url,
             bpm=bpm,
+            album=album,
+            release_date=release_date,
+            popularity=popularity,
         )
         if ack.request_id:
             bus.publish(

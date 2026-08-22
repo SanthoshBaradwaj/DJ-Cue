@@ -108,6 +108,8 @@ export default function GuestApp() {
       artist?: string;
       songId?: string | null;
       artworkUrl?: string | null;
+      album?: string | null;
+      popularity?: number | null;
     }) => {
       if (pending || !genre) return;
       setPending(true);
@@ -126,6 +128,8 @@ export default function GuestApp() {
           songArtist: song.artist,
           songId: song.songId,
           artworkUrl: song.artworkUrl,
+          album: song.album,
+          popularity: song.popularity,
         });
         if (!res.request_id) {
           setError(res.message || friendlyError());

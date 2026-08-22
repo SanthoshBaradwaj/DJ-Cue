@@ -32,6 +32,8 @@ export default function SongSearch({
     artist?: string;
     songId?: string | null;
     artworkUrl?: string | null;
+    album?: string | null;
+    popularity?: number | null;
   }) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -76,6 +78,8 @@ export default function SongSearch({
       artist: song.artist,
       songId: song.id,
       artworkUrl: song.artwork_url,
+      album: song.album,
+      popularity: song.popularity,
     });
   };
 

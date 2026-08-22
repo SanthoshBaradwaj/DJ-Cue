@@ -83,7 +83,16 @@ class FakeService:
         ]
 
     def submit_request(
-        self, event_id, session_id, song_title, song_artist, genre, song_id, artwork_url=None
+        self,
+        event_id,
+        session_id,
+        song_title,
+        song_artist,
+        genre,
+        song_id,
+        artwork_url=None,
+        album=None,
+        popularity=None,
     ):
         event = self.get_event(event_id)
         if event is not None and event.dj_status == "closed":
@@ -106,6 +115,8 @@ class FakeService:
                 request_count=1,
                 status="queued",
                 artwork_url=artwork_url,
+                album=album,
+                popularity=popularity,
             )
             self.requests[key] = req
             return RequestAck(

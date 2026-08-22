@@ -23,6 +23,40 @@ def now_ts() -> float:
 # ---------------------------------------------------------------------------
 
 
+class GenreBucket(BaseModel):
+    """One column of a DJ's genre-quota chart -- e.g. 5 Punjabi slots. The
+    `genres` list maps to this app's own genre keys (see genres.py); a
+    request's genre must match one of them to belong in this bucket."""
+
+    label: str
+    genres: List[str]
+    slots: int
+
+
+class EventSettings(BaseModel):
+    """Per-event configuration, entirely opt-in. Every field defaults to
+    "off" -- an event that never sets any of this behaves exactly like the
+    app always has. These are customizations a DJ turns on, never a second
+    set of rules every event has to actively opt out of."""
+
+    queue_cap: Optional[int] = None
+    genre_buckets: List[GenreBucket] = Field(default_factory=list)
+    # Shared budget across both a fresh request and an upvote on an
+    # existing one -- None means unlimited (today's behavior).
+    max_actions_per_session: Optional[int] = None
+    # If a bucket's backlog runs dry, may another genre's backlog fill the
+    # empty slot? Off by default -- a bucket runs short rather than a DJ's
+    # deliberate genre split getting silently overridden.
+    allow_cross_genre_backfill: bool = False
+    chart_rank_order: List[str] = Field(default_factory=lambda: ["votes"])
+    show_public_queue: bool = False
+    first_time_prompt_enabled: bool = False
+    instagram_handle: Optional[str] = None
+    venue_name: Optional[str] = None
+    start_time: Optional[str] = None
+    confirmation_toast_copy: Optional[str] = None
+
+
 class Event(BaseModel):
     id: str
     name: str
@@ -33,6 +67,7 @@ class Event(BaseModel):
     # requests -- enforced server-side, not just a display label).
     dj_status: str = "open"
     created_at: float = 0.0
+    settings: EventSettings = Field(default_factory=EventSettings)
 
 
 class EventCreate(BaseModel):
@@ -84,6 +119,14 @@ class Song(BaseModel):
     artist: str = ""
     genre: str = ""
     artwork_url: Optional[str] = None
+    # Straight from the same iTunes/Deezer response already fetched for
+    # the fields above -- no second call, no new integration.
+    album: Optional[str] = None
+    release_date: Optional[str] = None
+    # Deezer's own catalog rank -- a relative popularity score, not a
+    # literal stream count (Deezer's public API doesn't expose that).
+    # Always null for an iTunes-sourced result.
+    popularity: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +153,12 @@ class SongRequest(BaseModel):
     # a live Deezer search result; null otherwise (iTunes-sourced picks,
     # typed-anyway requests, and the static "popular right now" seed).
     bpm: Optional[int] = None
+    # Same provenance rule as bpm: real catalog metadata, resolved once at
+    # submit time, never AI-guessed. Null wherever the source lookup came
+    # up empty.
+    album: Optional[str] = None
+    release_date: Optional[str] = None
+    popularity: Optional[int] = None
     created_at: float = 0.0
     updated_at: float = 0.0
 
@@ -122,6 +171,12 @@ class RequestCreate(BaseModel):
     song_artist: str = ""
     song_id: Optional[str] = None
     artwork_url: Optional[str] = None
+    # Same trust level as artwork_url -- display data straight from the
+    # search result the guest tapped, not security-sensitive. release_date
+    # is deliberately not accepted from the client; it's always resolved
+    # server-side, same as bpm.
+    album: Optional[str] = None
+    popularity: Optional[int] = None
 
 
 class RequestAck(BaseModel):

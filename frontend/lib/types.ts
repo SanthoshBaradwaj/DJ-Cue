@@ -15,6 +15,32 @@ export interface PulseAck {
   message: string | null;
 }
 
+/** One column of a DJ's genre-quota chart. `genres` maps to this app's own
+ * genre keys; a request must match one of them to belong in this bucket. */
+export interface GenreBucket {
+  label: string;
+  genres: string[];
+  slots: number;
+}
+
+/** Per-event configuration, entirely opt-in. Every field defaults to "off"
+ * so an event with no settings behaves exactly like the app always has. */
+export interface EventSettings {
+  queue_cap: number | null;
+  genre_buckets: GenreBucket[];
+  /** Shared budget across a fresh request and an upvote on an existing one
+   * -- null means unlimited (today's behavior). */
+  max_actions_per_session: number | null;
+  allow_cross_genre_backfill: boolean;
+  chart_rank_order: string[];
+  show_public_queue: boolean;
+  first_time_prompt_enabled: boolean;
+  instagram_handle: string | null;
+  venue_name: string | null;
+  start_time: string | null;
+  confirmation_toast_copy: string | null;
+}
+
 export interface EventRecord {
   id: string;
   name: string;
@@ -24,6 +50,7 @@ export interface EventRecord {
    * time searching. */
   dj_status: DJStatus;
   created_at: number;
+  settings: EventSettings;
 }
 
 export interface Genre {
@@ -42,6 +69,11 @@ export interface Song {
   artist: string;
   genre: string;
   artwork_url: string | null;
+  album: string | null;
+  release_date: string | null;
+  /** Deezer's own catalog rank -- a relative popularity score, not a
+   * literal stream count. Always null for an iTunes-sourced result. */
+  popularity: number | null;
 }
 
 export type RequestStatus = "queued" | "played" | "dismissed";
@@ -61,6 +93,9 @@ export interface SongRequest {
   /** Real, measured tempo from Deezer's catalog metadata -- never AI
    * estimated. Only present for a Deezer-sourced pick; null otherwise. */
   bpm: number | null;
+  album: string | null;
+  release_date: string | null;
+  popularity: number | null;
   created_at: number;
   updated_at: number;
 }

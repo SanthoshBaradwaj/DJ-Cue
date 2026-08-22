@@ -185,6 +185,8 @@ def create_request(payload: RequestCreate):
         genre=(payload.genre or "").strip(),
         song_id=payload.song_id,
         artwork_url=payload.artwork_url,
+        album=payload.album,
+        popularity=payload.popularity,
     )
     return ack.model_dump(mode="json")
 

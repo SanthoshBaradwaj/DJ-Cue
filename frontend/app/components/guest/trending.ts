@@ -63,5 +63,8 @@ export function trendingFor(genreKey: string): Song[] {
     artist: t.artist,
     genre: genreKey,
     artwork_url: null,
+    album: null,
+    release_date: null,
+    popularity: null,
   }));
 }

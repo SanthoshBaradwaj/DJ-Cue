@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 import httpx
 
@@ -64,9 +64,22 @@ def _search_itunes(term: str, limit: int) -> List[Song]:
                 artist=row.get("artistName") or "",
                 genre=row.get("primaryGenreName") or "",
                 artwork_url=row.get("artworkUrl100"),
+                album=row.get("collectionName"),
+                # iTunes returns a full ISO8601 datetime ("2023-05-12T07:00:00Z")
+                # -- keep just the date portion so it reads the same as
+                # Deezer's plain "YYYY-MM-DD", regardless of which source a
+                # given pick came from.
+                release_date=_date_only(row.get("releaseDate")),
+                # iTunes has no popularity/streaming figure of its own.
             )
         )
     return songs
+
+
+def _date_only(value: Optional[str]) -> Optional[str]:
+    if not value or not isinstance(value, str):
+        return None
+    return value[:10] if len(value) >= 10 else value
 
 
 def _search_deezer(term: str, limit: int) -> List[Song]:
@@ -89,6 +102,7 @@ def _search_deezer(term: str, limit: int) -> List[Song]:
         if track_id is None or not title:
             continue
         album = row.get("album") or {}
+        rank = row.get("rank")
         songs.append(
             Song(
                 id="deezer:%s" % track_id,
@@ -96,6 +110,11 @@ def _search_deezer(term: str, limit: int) -> List[Song]:
                 artist=(row.get("artist") or {}).get("name") or "",
                 genre="",
                 artwork_url=album.get("cover_medium") or album.get("cover"),
+                album=album.get("title"),
+                # Deezer's own catalog rank -- present on search results,
+                # unlike release_date which only the per-track detail
+                # endpoint carries (see deezer_track_metadata below).
+                popularity=rank if isinstance(rank, int) else None,
             )
         )
     return songs
@@ -196,6 +215,72 @@ def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
         # This particular matching entry just wasn't analysed -- keep
         # checking the other candidates before giving up.
     return None
+
+
+def deezer_track_metadata(deezer_track_id: str) -> Dict[str, object]:
+    """Release date + popularity rank from the same per-track detail
+    endpoint bpm already calls -- a second, deliberate call at submit time,
+    never per search result. Same fail-soft contract as bpm: a slow or
+    missing lookup must never block a guest's request, it just means those
+    labels stay empty. Deliberately independent of deezer_track_bpm rather
+    than sharing its code path, so nothing here can regress bpm resolution.
+    """
+    try:
+        res = httpx.get(f"{_DEEZER_TRACK_URL}/{deezer_track_id}", timeout=_BPM_TIMEOUT_S)
+        res.raise_for_status()
+        payload = res.json()
+    except Exception as exc:
+        log.info("Deezer track metadata lookup failed for track %s: %s", deezer_track_id, exc)
+        return {"release_date": None, "popularity": None}
+    rank = payload.get("rank")
+    return {
+        "release_date": payload.get("release_date") or None,
+        "popularity": rank if isinstance(rank, int) else None,
+    }
+
+
+def deezer_metadata_by_title_artist(title: str, artist: str) -> Dict[str, object]:
+    """Release date + popularity fallback for a song picked from iTunes (or
+    typed by hand) rather than matched to a Deezer id directly -- same
+    title/artist matching rule as deezer_bpm_by_title_artist (case-
+    insensitive title, overlapping artist credit), kept as a wholly
+    separate lookup so a change here can never touch bpm resolution.
+    Popularity comes straight off the search row (no extra call); release
+    date needs the one detail-endpoint call the search response doesn't
+    carry.
+    """
+    title = (title or "").strip()
+    artist = (artist or "").strip()
+    if not title:
+        return {"release_date": None, "popularity": None}
+    term = f"{title} {artist}".strip()
+    try:
+        res = httpx.get(_DEEZER_URL, params={"q": term, "limit": 5}, timeout=_BPM_TIMEOUT_S)
+        res.raise_for_status()
+        rows = res.json().get("data", [])
+    except Exception as exc:
+        log.info("Deezer metadata-by-title lookup failed for %r: %s", term, exc)
+        return {"release_date": None, "popularity": None}
+
+    norm_title = title.lower()
+    requested_artists = _artist_tokens(artist) if artist else set()
+    for row in rows:
+        row_title = (row.get("title") or "").strip().lower()
+        if row_title != norm_title:
+            continue
+        if requested_artists:
+            row_artists = _artist_tokens((row.get("artist") or {}).get("name") or "")
+            if not (requested_artists & row_artists):
+                continue
+        rank = row.get("rank")
+        popularity = rank if isinstance(rank, int) else None
+        track_id = row.get("id")
+        release_date = None
+        if track_id is not None:
+            release_date = deezer_track_metadata(str(track_id)).get("release_date")
+        if popularity is not None or release_date is not None:
+            return {"release_date": release_date, "popularity": popularity}
+    return {"release_date": None, "popularity": None}
 
 
 def search(query: str, genre: Optional[str] = None, limit: int = 8) -> List[Song]:

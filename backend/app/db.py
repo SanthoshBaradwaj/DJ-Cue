@@ -63,6 +63,7 @@ def _row_to_event(row: Dict) -> Event:
         status=row.get("status", "active"),
         dj_status=row.get("dj_status") or "open",
         created_at=_epoch(row.get("created_at")),
+        settings=row.get("settings") or {},
     )
 
 
@@ -78,6 +79,9 @@ def _row_to_request(row: Dict) -> SongRequest:
         status=row.get("status", "queued"),
         artwork_url=row.get("artwork_url"),
         bpm=row.get("bpm"),
+        album=row.get("album_name"),
+        release_date=row.get("release_date"),
+        popularity=row.get("popularity"),
         created_at=_epoch(row.get("created_at")),
         updated_at=_epoch(row.get("updated_at")),
     )
@@ -183,6 +187,9 @@ class Store:
         song_id: Optional[str] = None,
         artwork_url: Optional[str] = None,
         bpm: Optional[int] = None,
+        album: Optional[str] = None,
+        release_date: Optional[str] = None,
+        popularity: Optional[int] = None,
     ) -> RequestAck:
         res = _exec(
             lambda: self.client.rpc(
@@ -197,6 +204,9 @@ class Store:
                     "p_cooldown_seconds": settings.submit_cooldown_s,
                     "p_artwork_url": artwork_url,
                     "p_bpm": bpm,
+                    "p_album": album,
+                    "p_release_date": release_date,
+                    "p_popularity": popularity,
                 },
             )
         )

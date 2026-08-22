@@ -108,6 +108,8 @@ export const api = {
     songArtist?: string;
     songId?: string | null;
     artworkUrl?: string | null;
+    album?: string | null;
+    popularity?: number | null;
   }) =>
     json<RequestAck>("/api/requests", {
       method: "POST",
@@ -119,6 +121,8 @@ export const api = {
         song_artist: input.songArtist ?? "",
         song_id: input.songId ?? null,
         artwork_url: input.artworkUrl ?? null,
+        album: input.album ?? null,
+        popularity: input.popularity ?? null,
       }),
     }),
 
