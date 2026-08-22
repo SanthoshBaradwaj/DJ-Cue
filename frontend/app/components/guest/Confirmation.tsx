@@ -46,10 +46,15 @@ function Ripple() {
 
 export default function Confirmation({
   ack,
+  toastCopy,
   onRequestAnother,
   onChangeGenre,
 }: {
   ack: RequestAck;
+  /** DJ-configured copy (settings.confirmation_toast_copy) that replaces the
+   * default per-submission message when set. Null for every event that
+   * hasn't configured one -- unchanged behaviour. */
+  toastCopy?: string | null;
   onRequestAnother: () => void;
   onChangeGenre: () => void;
 }) {
@@ -59,7 +64,12 @@ export default function Confirmation({
     headingRef.current?.focus();
   }, []);
 
-  const crowd = ack.request_count > 1;
+  // The configured copy is a complete, self-contained message (DJ
+  // Prashant's own wording doesn't reference a vote count) -- showing it
+  // alongside the crowd-count line would read like two different messages
+  // bolted together, so it takes over the whole block instead of just the
+  // heading.
+  const crowd = !toastCopy && ack.request_count > 1;
 
   return (
     <div className="flex flex-col">
@@ -76,8 +86,14 @@ export default function Confirmation({
           &ldquo;{ack.song_title}&rdquo;
         </p>
 
-        <h1 className="mt-2 text-[27px] leading-[1.2] font-semibold tracking-[-0.02em] text-balance text-chalk">
-          {ack.message || "Got it. The DJ has your request."}
+        <h1
+          className={
+            toastCopy
+              ? "mt-2 max-w-[22rem] text-[19px] leading-[1.5] font-medium text-balance text-chalk"
+              : "mt-2 text-[27px] leading-[1.2] font-semibold tracking-[-0.02em] text-balance text-chalk"
+          }
+        >
+          {toastCopy || ack.message || "Got it. The DJ has your request."}
         </h1>
 
         {crowd ? (
@@ -90,14 +106,14 @@ export default function Confirmation({
             </span>{" "}
             people want this one.
           </p>
-        ) : (
+        ) : !toastCopy ? (
           <p
             className="mt-5 max-w-[21rem] text-[17px] leading-[1.45] text-mist animate-rise"
             style={{ animationDelay: "120ms", animationFillMode: "backwards" }}
           >
             The DJ sees it on the dashboard now.
           </p>
-        )}
+        ) : null}
       </div>
 
       <button

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { DJStatus, PulseStatus, RequestAck } from "@/lib/types";
+import type { DJStatus, EventSettings, PulseStatus, RequestAck } from "@/lib/types";
 import Confirmation from "./Confirmation";
+import FirstTimeModal from "./FirstTimeModal";
 import GenreGrid from "./GenreGrid";
 import SongSearch from "./SongSearch";
 
@@ -35,6 +36,12 @@ export default function GuestApp() {
   const [pulse, setPulse] = useState<PulseStatus | null>(null);
   const [pulseLimited, setPulseLimited] = useState(false);
   const [pulsePending, setPulsePending] = useState(false);
+  const [settings, setSettings] = useState<EventSettings | null>(null);
+  const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
+  // Sticky once true -- the session's request/upvote budget only ever
+  // shrinks. Reset when eventId itself changes (a fresh event, a fresh
+  // budget), not on every render.
+  const [actionLimited, setActionLimited] = useState(false);
 
   const eventIdRef = useRef(eventId);
   useEffect(() => {
@@ -61,6 +68,7 @@ export default function GuestApp() {
           if (!alive) return;
           setEventId(cfg.event_id);
           setDjStatus(cfg.dj_status);
+          setSettings(cfg.settings);
         })
         .catch(() => {
           if (fromUrl && alive) setEventId((prev) => prev ?? fromUrl);
@@ -76,6 +84,34 @@ export default function GuestApp() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- eventIdRef sidesteps re-subscribing the interval on every id change
   }, []);
+
+  useEffect(() => {
+    setActionLimited(false);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId || !settings?.first_time_prompt_enabled) return;
+    if (typeof window === "undefined") return;
+    if (window.localStorage.getItem(`cue_fta_seen_${eventId}`)) return;
+    setShowFirstTimeModal(true);
+  }, [eventId, settings]);
+
+  const dismissFirstTimeModal = useCallback(() => {
+    if (eventId && typeof window !== "undefined") {
+      window.localStorage.setItem(`cue_fta_seen_${eventId}`, "1");
+    }
+    setShowFirstTimeModal(false);
+  }, [eventId]);
+
+  const answerFirstTime = useCallback(
+    (answer: "yes" | "no") => {
+      if (eventId) {
+        api.firstTimeAnswer(eventId, answer).catch(() => undefined);
+      }
+      dismissFirstTimeModal();
+    },
+    [eventId, dismissFirstTimeModal],
+  );
 
   const pickGenre = useCallback((key: string) => {
     setGenre(key);
@@ -131,6 +167,7 @@ export default function GuestApp() {
           album: song.album,
           popularity: song.popularity,
         });
+        if (res.action_limited) setActionLimited(true);
         if (!res.request_id) {
           setError(res.message || friendlyError());
           return;
@@ -167,44 +204,58 @@ export default function GuestApp() {
   const eventLine = eventId ? "Live now" : "Connecting…";
 
   return (
-    <main
-      className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col px-5"
-      style={{
-        paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)",
-        paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)",
-        paddingLeft: "calc(env(safe-area-inset-left) + 1.25rem)",
-        paddingRight: "calc(env(safe-area-inset-right) + 1.25rem)",
-      }}
-    >
-      <p className="sr-only" role="status" aria-live="polite">
-        {pending ? "Sending your request" : (error ?? "")}
-      </p>
-
-      {step === "genre" && (
-        <GenreGrid
-          eventLine={eventLine}
-          djStatus={djStatus}
-          pulse={pulse}
-          pulseLimited={pulseLimited}
-          pulsePending={pulsePending}
-          onPick={pickGenre}
-          onPulseChange={changePulse}
-        />
+    <>
+      {showFirstTimeModal && (
+        <FirstTimeModal onAnswer={answerFirstTime} onDismiss={dismissFirstTimeModal} />
       )}
+      <main
+        className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col px-5"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)",
+          paddingLeft: "calc(env(safe-area-inset-left) + 1.25rem)",
+          paddingRight: "calc(env(safe-area-inset-right) + 1.25rem)",
+        }}
+      >
+        <p className="sr-only" role="status" aria-live="polite">
+          {pending ? "Sending your request" : (error ?? "")}
+        </p>
 
-      {step === "song" && genre && (
-        <SongSearch
-          genreKey={genre}
-          pending={pending}
-          error={error}
-          onBack={backToGenres}
-          onSubmit={submit}
-        />
-      )}
+        {step === "genre" && (
+          <GenreGrid
+            eventLine={eventLine}
+            djStatus={djStatus}
+            pulse={pulse}
+            pulseLimited={pulseLimited}
+            pulsePending={pulsePending}
+            instagramHandle={settings?.instagram_handle ?? null}
+            onPick={pickGenre}
+            onPulseChange={changePulse}
+          />
+        )}
 
-      {step === "confirm" && ack && (
-        <Confirmation ack={ack} onRequestAnother={requestAnother} onChangeGenre={changeGenre} />
-      )}
-    </main>
+        {step === "song" && genre && (
+          <SongSearch
+            genreKey={genre}
+            eventId={eventId}
+            pending={pending}
+            error={error}
+            actionLimited={actionLimited}
+            showPublicQueue={Boolean(settings?.show_public_queue)}
+            onBack={backToGenres}
+            onSubmit={submit}
+          />
+        )}
+
+        {step === "confirm" && ack && (
+          <Confirmation
+            ack={ack}
+            toastCopy={settings?.confirmation_toast_copy ?? null}
+            onRequestAnother={requestAnother}
+            onChangeGenre={changeGenre}
+          />
+        )}
+      </main>
+    </>
   );
 }

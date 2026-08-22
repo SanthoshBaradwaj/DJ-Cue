@@ -27,6 +27,7 @@ export default function GenreGrid({
   pulse,
   pulseLimited,
   pulsePending,
+  instagramHandle,
   onPick,
   onPulseChange,
 }: {
@@ -35,6 +36,8 @@ export default function GenreGrid({
   pulse?: PulseStatus | null;
   pulseLimited?: boolean;
   pulsePending?: boolean;
+  /** Config-gated -- only rendered when the DJ has set one. */
+  instagramHandle?: string | null;
   onPick: (genreKey: string) => void;
   onPulseChange?: (status: PulseStatus) => void;
 }) {
@@ -82,6 +85,22 @@ export default function GenreGrid({
           pending={Boolean(pulsePending)}
           onChange={onPulseChange}
         />
+      )}
+
+      {instagramHandle && (
+        <a
+          href={`https://www.instagram.com/${instagramHandle}/`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="tap mt-4 flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-ink-line bg-gradient-to-r from-[#f9ce34]/15 via-[#ee2a7b]/15 to-[#6228d7]/15 text-[14px] font-semibold text-chalk transition-colors duration-150 active:from-[#f9ce34]/25 active:via-[#ee2a7b]/25 active:to-[#6228d7]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+        >
+          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          Follow the DJ on Instagram
+        </a>
       )}
 
       {closed ? (

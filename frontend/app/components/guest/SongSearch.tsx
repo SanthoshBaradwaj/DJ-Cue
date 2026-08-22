@@ -2,12 +2,33 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { Song } from "@/lib/types";
+import type { Song, SongRequest } from "@/lib/types";
 import { genreLabel } from "./genres";
 import { haptic } from "./motion";
 import { trendingFor } from "./trending";
 
 const DEBOUNCE_MS = 180;
+
+// How often to refresh the "already requested" list while this screen is
+// open -- matches the DJ status poll cadence elsewhere in the guest app.
+// It's a plain poll, not the dashboard's websocket feed: this screen is
+// open for seconds, not the whole set, so a socket connection isn't worth
+// it for a "live-ish" list.
+const PUBLIC_QUEUE_POLL_MS = 4000;
+const PUBLIC_QUEUE_LIMIT = 6;
+
+function requestToSong(r: SongRequest): Song {
+  return {
+    id: r.id,
+    title: r.song_title,
+    artist: r.song_artist,
+    genre: r.genre,
+    artwork_url: r.artwork_url,
+    album: r.album,
+    release_date: r.release_date,
+    popularity: r.popularity,
+  };
+}
 
 /**
  * Screen 2 of the guest flow: type, see matches, tap one to send it.
@@ -18,14 +39,26 @@ const DEBOUNCE_MS = 180;
  */
 export default function SongSearch({
   genreKey,
+  eventId,
   pending,
   error,
+  actionLimited,
+  showPublicQueue,
   onBack,
   onSubmit,
 }: {
   genreKey: string;
+  eventId?: string | null;
   pending: boolean;
   error: string | null;
+  /** This session has spent its configured request/upvote budget -- disable
+   * further taps rather than let every one round-trip to a guaranteed
+   * rejection. Always false for an event with no cap configured. */
+  actionLimited?: boolean;
+  /** Config-gated (settings.show_public_queue): render an "already
+   * requested" list above trending so a guest can upvote instead of
+   * re-typing a song someone already asked for. */
+  showPublicQueue?: boolean;
   onBack: () => void;
   onSubmit: (song: {
     title: string;
@@ -39,13 +72,50 @@ export default function SongSearch({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Song[]>([]);
   const [searching, setSearching] = useState(false);
-  const trending = trendingFor(genreKey);
+  const [publicQueue, setPublicQueue] = useState<SongRequest[]>([]);
+  const genreQueue = showPublicQueue
+    ? publicQueue.filter((r) => r.genre === genreKey).slice(0, PUBLIC_QUEUE_LIMIT)
+    : [];
+  // A curated trending pick and a real live request can be the same song --
+  // don't show it twice. The live one wins since it reflects what this
+  // crowd actually asked for, not a generic suggestion.
+  const trending = trendingFor(genreKey).filter(
+    (t) =>
+      !genreQueue.some(
+        (r) =>
+          r.song_title.toLowerCase() === t.title.toLowerCase() &&
+          (r.song_artist || "").toLowerCase() === (t.artist || "").toLowerCase(),
+      ),
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blocked = pending || Boolean(actionLimited);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!showPublicQueue || !eventId) {
+      setPublicQueue([]);
+      return;
+    }
+    let alive = true;
+    const refresh = () => {
+      api
+        .dashboard(eventId)
+        .then((state) => {
+          if (alive) setPublicQueue(state.requests);
+        })
+        .catch(() => undefined);
+    };
+    refresh();
+    const timer = setInterval(refresh, PUBLIC_QUEUE_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [showPublicQueue, eventId]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -72,6 +142,7 @@ export default function SongSearch({
   }, [query, genreKey]);
 
   const pickSong = (song: Song) => {
+    if (blocked) return;
     haptic(12);
     onSubmit({
       title: song.title,
@@ -85,7 +156,7 @@ export default function SongSearch({
 
   const requestTyped = () => {
     const value = query.trim();
-    if (!value || pending) return;
+    if (!value || blocked) return;
     haptic(12);
     onSubmit({ title: value, songId: null });
   };
@@ -132,27 +203,31 @@ export default function SongSearch({
           spellCheck={false}
           enterKeyHint="search"
           maxLength={120}
-          disabled={pending}
+          disabled={blocked}
           className="block w-full bg-transparent text-[20px] font-medium tracking-[-0.01em] text-chalk caret-cue-1 outline-none placeholder:text-mist/60 disabled:opacity-70"
         />
       </div>
 
-      {error ? (
+      {actionLimited ? (
+        <p role="alert" className="mt-3 rounded-xl border border-ink-line bg-ink-card/80 px-4 py-3 text-[14px] text-mist animate-rise">
+          {error || "You've used up your requests for tonight -- thanks for playing along!"}
+        </p>
+      ) : error ? (
         <p role="alert" className="mt-3 rounded-xl border border-hold/40 bg-hold/10 px-4 py-3 text-[14px] text-chalk/90 animate-rise">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-4 min-h-[3rem]">
+      <div className="mt-4 flex min-h-[3rem] flex-col gap-5">
         {query.trim() ? (
           results.length > 0 ? (
-            <SongList songs={results} pending={pending} onPick={pickSong} />
+            <SongList songs={results} pending={blocked} onPick={pickSong} />
           ) : !searching ? (
             <div className="animate-rise">
               <p className="px-1 text-[14px] text-mist">No match in the catalog yet.</p>
               <button
                 type="button"
-                disabled={pending}
+                disabled={blocked}
                 onClick={requestTyped}
                 className="tap mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cue-1 to-cue-2 text-[17px] font-semibold text-white shadow-[0_10px_40px_-12px_rgba(255,45,120,0.75)] transition-all duration-150 active:scale-[0.985] disabled:cursor-not-allowed disabled:bg-none disabled:bg-ink-card disabled:text-mist disabled:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chalk/80 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
               >
@@ -167,19 +242,33 @@ export default function SongSearch({
               </button>
             </div>
           ) : null
-        ) : trending.length > 0 ? (
-          <div className="animate-rise">
-            <p className="px-1 text-[12px] font-medium uppercase tracking-[0.14em] text-mist/60">
-              Popular right now
-            </p>
-            <div className="mt-2">
-              <SongList songs={trending} pending={pending} onPick={pickSong} />
-            </div>
-          </div>
         ) : (
-          <p className="px-1 text-[14px] text-mist/70">
-            Start typing — matches from the {genreLabel(genreKey)} catalog show up here.
-          </p>
+          <>
+            {genreQueue.length > 0 && (
+              <div className="animate-rise">
+                <p className="px-1 text-[12px] font-medium uppercase tracking-[0.14em] text-mist/60">
+                  Already requested — tap to upvote
+                </p>
+                <div className="mt-2">
+                  <SongList songs={genreQueue.map(requestToSong)} pending={blocked} onPick={pickSong} />
+                </div>
+              </div>
+            )}
+            {trending.length > 0 ? (
+              <div className="animate-rise">
+                <p className="px-1 text-[12px] font-medium uppercase tracking-[0.14em] text-mist/60">
+                  Popular right now
+                </p>
+                <div className="mt-2">
+                  <SongList songs={trending} pending={blocked} onPick={pickSong} />
+                </div>
+              </div>
+            ) : genreQueue.length === 0 ? (
+              <p className="px-1 text-[14px] text-mist/70">
+                Start typing — matches from the {genreLabel(genreKey)} catalog show up here.
+              </p>
+            ) : null}
+          </>
         )}
       </div>
     </div>
