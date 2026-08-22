@@ -127,14 +127,20 @@ class CueService:
     def build_dashboard(self, event_id: str) -> DashboardState:
         requests = self.store.queued_requests(event_id)
         event = self.store.get_event(event_id)
-        buckets = (
-            self._build_buckets(requests, event.settings)
-            if event and event.settings.genre_buckets
-            else None
-        )
+        display_requests = requests
+        buckets = None
+        if event and event.settings.genre_buckets:
+            buckets = self._build_buckets(requests, event.settings)
+        elif event and event.settings.queue_cap:
+            # No bucket chart configured, but a flat display cap is -- e.g. a
+            # future DJ who wants "top N" without a genre split. requests is
+            # already ranked (highest request_count first), so this is a
+            # display truncation, not a re-sort. stats stays computed off the
+            # full, uncapped list below -- the cap only trims what's shown.
+            display_requests = requests[: event.settings.queue_cap]
         return DashboardState(
             event_id=event_id,
-            requests=requests,
+            requests=display_requests,
             stats=self.store.stats(event_id, queued=requests),
             buckets=buckets,
         )
