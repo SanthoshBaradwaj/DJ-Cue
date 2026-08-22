@@ -95,6 +95,8 @@ class FakeService:
         artwork_url=None,
         album=None,
         popularity=None,
+        catalog_url=None,
+        duration_seconds=None,
     ):
         event = self.get_event(event_id)
         if event is not None and event.dj_status == "closed":
@@ -119,6 +121,8 @@ class FakeService:
                 artwork_url=artwork_url,
                 album=album,
                 popularity=popularity,
+                catalog_url=catalog_url,
+                duration_seconds=duration_seconds,
             )
             self.requests[key] = req
             return RequestAck(

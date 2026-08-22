@@ -26,6 +26,8 @@ function requestToSong(r: SongRequest): Song {
     album: r.album,
     release_date: r.release_date,
     popularity: r.popularity,
+    catalog_url: r.catalog_url,
+    duration_seconds: r.duration_seconds,
   };
 }
 
@@ -76,6 +78,8 @@ export default function SongSearch({
     artworkUrl?: string | null;
     album?: string | null;
     popularity?: number | null;
+    catalogUrl?: string | null;
+    durationSeconds?: number | null;
   }) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -160,6 +164,8 @@ export default function SongSearch({
       artworkUrl: song.artwork_url,
       album: song.album,
       popularity: song.popularity,
+      catalogUrl: song.catalog_url,
+      durationSeconds: song.duration_seconds,
     });
   };
 

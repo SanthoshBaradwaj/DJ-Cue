@@ -4,10 +4,29 @@ import { useEffect, useRef } from "react";
 import type { SongRequest } from "@/lib/types";
 import { genreColor, genreLabel } from "../guest/genres";
 
+function formatDuration(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Which source a catalog_url points at, purely for the link's own label --
+ * the DJ shouldn't have to guess what tapping it opens. */
+function catalogSourceLabel(url: string): string {
+  if (url.includes("apple.com")) return "Apple Music";
+  if (url.includes("deezer.com")) return "Deezer";
+  return "Listen";
+}
+
 /**
  * Click-to-expand metadata for one queued request -- Title, Artist, Album,
- * BPM, Vote Count, all in one place instead of the compact grid card's
- * truncated title/artist/count. Play and Dismiss are repeated here so a DJ
+ * BPM, Release Date, Duration, Vote Count, and a direct link to the track
+ * on its source catalog, all in one place instead of the compact grid
+ * card's truncated title/artist/count. Duration and the catalog link are
+ * near-universally available (straight off the search result, not
+ * dependent on Deezer's own tempo analysis like BPM is) -- so even when
+ * BPM/release date come up empty, there's still a fast, concrete way to
+ * identify the exact recording. Play and Dismiss are repeated here so a DJ
  * who opened this to double-check a song can act without closing it first.
  */
 export function BucketDetailModal({
@@ -88,12 +107,17 @@ export function BucketDetailModal({
 
         <dl className="mt-5 grid grid-cols-2 gap-3">
           <Field label="Album" value={request.album} />
+          <Field
+            label="Duration"
+            value={request.duration_seconds ? formatDuration(request.duration_seconds) : null}
+          />
           <Field label="BPM" value={request.bpm ? String(request.bpm) : null} />
+          <Field label="Release date" value={request.release_date} />
           <Field
             label="Vote count"
             value={`${request.request_count} request${request.request_count === 1 ? "" : "s"}`}
           />
-          <Field label="Release date" value={request.release_date} />
+          <LinkField label="Listen" href={request.catalog_url} />
         </dl>
 
         <div className="mt-6 flex gap-2.5">
@@ -141,6 +165,30 @@ function Field({ label, value }: { label: string; value: string | null }) {
       >
         {known ? value : "Not available"}
       </dd>
+    </div>
+  );
+}
+
+function LinkField({ label, href }: { label: string; href: string | null }) {
+  return (
+    <div>
+      <dt className="text-[11px] font-medium uppercase tracking-[0.1em] text-mist/60">{label}</dt>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="tap mt-0.5 inline-flex items-center gap-1 truncate text-[15px] font-medium text-cue-1 underline decoration-cue-1/40 underline-offset-2 transition-colors active:text-cue-2"
+        >
+          {catalogSourceLabel(href)}
+          <svg viewBox="0 0 12 12" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 2h6v6M10 2 4.5 7.5" />
+          </svg>
+        </a>
+      ) : (
+        <dd className="mt-0.5 truncate text-[15px] font-medium text-mist/50 italic">Not available</dd>
+      )}
     </div>
   );
 }

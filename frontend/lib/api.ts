@@ -112,6 +112,8 @@ export const api = {
     artworkUrl?: string | null;
     album?: string | null;
     popularity?: number | null;
+    catalogUrl?: string | null;
+    durationSeconds?: number | null;
   }) =>
     json<RequestAck>("/api/requests", {
       method: "POST",
@@ -125,6 +127,8 @@ export const api = {
         artwork_url: input.artworkUrl ?? null,
         album: input.album ?? null,
         popularity: input.popularity ?? null,
+        catalog_url: input.catalogUrl ?? null,
+        duration_seconds: input.durationSeconds ?? null,
       }),
     }),
 

@@ -147,6 +147,16 @@ class Song(BaseModel):
     # literal stream count (Deezer's public API doesn't expose that).
     # Always null for an iTunes-sourced result.
     popularity: Optional[int] = None
+    # A direct link to the track on its source catalog (Apple Music's own
+    # trackViewUrl, or Deezer's link) -- lets the DJ open/preview the exact
+    # recording in one tap to confirm it's the right one. Same provenance
+    # as album/artwork: whichever source matched, verbatim, never built or
+    # guessed from a title/artist string.
+    catalog_url: Optional[str] = None
+    # Track length in seconds, straight off the same search result -- a
+    # DJ-relevant fact (mix planning) that's also a near-universal
+    # identifying detail, unlike bpm which only Deezer's catalog measures.
+    duration_seconds: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +189,9 @@ class SongRequest(BaseModel):
     album: Optional[str] = None
     release_date: Optional[str] = None
     popularity: Optional[int] = None
+    # Same provenance as Song.catalog_url/duration_seconds -- see there.
+    catalog_url: Optional[str] = None
+    duration_seconds: Optional[int] = None
     created_at: float = 0.0
     updated_at: float = 0.0
 
@@ -197,6 +210,8 @@ class RequestCreate(BaseModel):
     # server-side, same as bpm.
     album: Optional[str] = None
     popularity: Optional[int] = None
+    catalog_url: Optional[str] = None
+    duration_seconds: Optional[int] = None
 
 
 class RequestAck(BaseModel):

@@ -90,6 +90,8 @@ def _row_to_request(row: Dict) -> SongRequest:
         album=row.get("album_name"),
         release_date=row.get("release_date"),
         popularity=row.get("popularity"),
+        catalog_url=row.get("catalog_url"),
+        duration_seconds=row.get("duration_seconds"),
         created_at=_epoch(row.get("created_at")),
         updated_at=_epoch(row.get("updated_at")),
     )
@@ -198,6 +200,8 @@ class Store:
         album: Optional[str] = None,
         release_date: Optional[str] = None,
         popularity: Optional[int] = None,
+        catalog_url: Optional[str] = None,
+        duration_seconds: Optional[int] = None,
     ) -> RequestAck:
         res = _exec(
             lambda: self.client.rpc(
@@ -215,6 +219,8 @@ class Store:
                     "p_album": album,
                     "p_release_date": release_date,
                     "p_popularity": popularity,
+                    "p_catalog_url": catalog_url,
+                    "p_duration_seconds": duration_seconds,
                 },
             )
         )

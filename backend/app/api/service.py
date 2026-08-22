@@ -205,6 +205,8 @@ class CueService:
         artwork_url: Optional[str] = None,
         album: Optional[str] = None,
         popularity: Optional[int] = None,
+        catalog_url: Optional[str] = None,
+        duration_seconds: Optional[int] = None,
     ) -> RequestAck:
         # Real BPM, resolved once here rather than at search time. A direct
         # Deezer id gives an exact track; anything else (an iTunes match --
@@ -230,6 +232,16 @@ class CueService:
         release_date = detail.get("release_date")
         if popularity is None:
             popularity = detail.get("popularity")
+        # catalog_url/duration_seconds: same backfill-only-if-empty rule as
+        # popularity -- the search result the guest tapped already carries
+        # its own source's values (Apple Music's for an iTunes pick,
+        # Deezer's for a Deezer pick); this Deezer lookup only fills the
+        # gap for a typed-anyway request or a pick whose source happened
+        # not to carry one.
+        if not catalog_url:
+            catalog_url = detail.get("catalog_url")
+        if not duration_seconds:
+            duration_seconds = detail.get("duration_seconds")
 
         ack = self.store.submit_request(
             event_id=event_id,
@@ -243,6 +255,8 @@ class CueService:
             album=album,
             release_date=release_date,
             popularity=popularity,
+            catalog_url=catalog_url,
+            duration_seconds=duration_seconds,
         )
         if ack.request_id:
             bus.publish(

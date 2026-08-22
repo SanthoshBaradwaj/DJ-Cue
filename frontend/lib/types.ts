@@ -74,6 +74,10 @@ export interface Song {
   /** Deezer's own catalog rank -- a relative popularity score, not a
    * literal stream count. Always null for an iTunes-sourced result. */
   popularity: number | null;
+  /** Direct link to the track on its source catalog (Apple Music or
+   * Deezer) -- lets a DJ open/preview the exact recording in one tap. */
+  catalog_url: string | null;
+  duration_seconds: number | null;
 }
 
 export type RequestStatus = "queued" | "played" | "dismissed";
@@ -96,6 +100,8 @@ export interface SongRequest {
   album: string | null;
   release_date: string | null;
   popularity: number | null;
+  catalog_url: string | null;
+  duration_seconds: number | null;
   created_at: number;
   updated_at: number;
 }

@@ -154,6 +154,8 @@ export default function GuestApp() {
       artworkUrl?: string | null;
       album?: string | null;
       popularity?: number | null;
+      catalogUrl?: string | null;
+      durationSeconds?: number | null;
     }) => {
       if (pending || !genre) return;
       setPending(true);
@@ -174,6 +176,8 @@ export default function GuestApp() {
           artworkUrl: song.artworkUrl,
           album: song.album,
           popularity: song.popularity,
+          catalogUrl: song.catalogUrl,
+          durationSeconds: song.durationSeconds,
         });
         if (res.action_limited) setActionLimited(true);
         if (!res.request_id) {

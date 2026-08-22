@@ -194,6 +194,8 @@ def create_request(payload: RequestCreate):
         artwork_url=payload.artwork_url,
         album=payload.album,
         popularity=payload.popularity,
+        catalog_url=payload.catalog_url,
+        duration_seconds=payload.duration_seconds,
     )
     return ack.model_dump(mode="json")
 

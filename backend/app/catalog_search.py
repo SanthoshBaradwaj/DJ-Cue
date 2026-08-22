@@ -57,6 +57,7 @@ def _search_itunes(term: str, limit: int) -> List[Song]:
         title = row.get("trackName")
         if track_id is None or not title:
             continue
+        duration_ms = row.get("trackTimeMillis")
         songs.append(
             Song(
                 id="itunes:%s" % track_id,
@@ -71,6 +72,12 @@ def _search_itunes(term: str, limit: int) -> List[Song]:
                 # given pick came from.
                 release_date=_date_only(row.get("releaseDate")),
                 # iTunes has no popularity/streaming figure of its own.
+                # The Apple Music page for this exact recording -- already on
+                # the search response, no second call.
+                catalog_url=row.get("trackViewUrl"),
+                duration_seconds=(
+                    round(duration_ms / 1000) if isinstance(duration_ms, (int, float)) else None
+                ),
             )
         )
     return songs
@@ -103,6 +110,7 @@ def _search_deezer(term: str, limit: int) -> List[Song]:
             continue
         album = row.get("album") or {}
         rank = row.get("rank")
+        duration = row.get("duration")
         songs.append(
             Song(
                 id="deezer:%s" % track_id,
@@ -115,6 +123,10 @@ def _search_deezer(term: str, limit: int) -> List[Song]:
                 # unlike release_date which only the per-track detail
                 # endpoint carries (see deezer_track_metadata below).
                 popularity=rank if isinstance(rank, int) else None,
+                # link/duration are both on the search row already, same as
+                # rank -- no extra call needed, unlike bpm/release_date.
+                catalog_url=row.get("link"),
+                duration_seconds=duration if isinstance(duration, int) else None,
             )
         )
     return songs
@@ -218,41 +230,59 @@ def deezer_bpm_by_title_artist(title: str, artist: str) -> Optional[int]:
 
 
 def deezer_track_metadata(deezer_track_id: str) -> Dict[str, object]:
-    """Release date + popularity rank from the same per-track detail
-    endpoint bpm already calls -- a second, deliberate call at submit time,
-    never per search result. Same fail-soft contract as bpm: a slow or
-    missing lookup must never block a guest's request, it just means those
-    labels stay empty. Deliberately independent of deezer_track_bpm rather
-    than sharing its code path, so nothing here can regress bpm resolution.
+    """Release date + popularity rank (+ link/duration as a defensive
+    backfill -- the search row already carries those, this only matters if
+    that value somehow didn't make it through) from the same per-track
+    detail endpoint bpm already calls -- a second, deliberate call at
+    submit time, never per search result. Same fail-soft contract as bpm: a
+    slow or missing lookup must never block a guest's request, it just
+    means those labels stay empty. Deliberately independent of
+    deezer_track_bpm rather than sharing its code path, so nothing here can
+    regress bpm resolution.
     """
+    empty: Dict[str, object] = {
+        "release_date": None,
+        "popularity": None,
+        "catalog_url": None,
+        "duration_seconds": None,
+    }
     try:
         res = httpx.get(f"{_DEEZER_TRACK_URL}/{deezer_track_id}", timeout=_BPM_TIMEOUT_S)
         res.raise_for_status()
         payload = res.json()
     except Exception as exc:
         log.info("Deezer track metadata lookup failed for track %s: %s", deezer_track_id, exc)
-        return {"release_date": None, "popularity": None}
+        return empty
     rank = payload.get("rank")
+    duration = payload.get("duration")
     return {
         "release_date": payload.get("release_date") or None,
         "popularity": rank if isinstance(rank, int) else None,
+        "catalog_url": payload.get("link") or None,
+        "duration_seconds": duration if isinstance(duration, int) else None,
     }
 
 
 def deezer_metadata_by_title_artist(title: str, artist: str) -> Dict[str, object]:
-    """Release date + popularity fallback for a song picked from iTunes (or
-    typed by hand) rather than matched to a Deezer id directly -- same
-    title/artist matching rule as deezer_bpm_by_title_artist (case-
-    insensitive title, overlapping artist credit), kept as a wholly
-    separate lookup so a change here can never touch bpm resolution.
-    Popularity comes straight off the search row (no extra call); release
-    date needs the one detail-endpoint call the search response doesn't
-    carry.
+    """Release date + popularity + link/duration fallback for a song picked
+    from iTunes (or typed by hand) rather than matched to a Deezer id
+    directly -- same title/artist matching rule as
+    deezer_bpm_by_title_artist (case-insensitive title, overlapping artist
+    credit), kept as a wholly separate lookup so a change here can never
+    touch bpm resolution. Popularity/link/duration come straight off the
+    search row (no extra call); release date needs the one detail-endpoint
+    call the search response doesn't carry.
     """
+    empty: Dict[str, object] = {
+        "release_date": None,
+        "popularity": None,
+        "catalog_url": None,
+        "duration_seconds": None,
+    }
     title = (title or "").strip()
     artist = (artist or "").strip()
     if not title:
-        return {"release_date": None, "popularity": None}
+        return empty
     term = f"{title} {artist}".strip()
     try:
         res = httpx.get(_DEEZER_URL, params={"q": term, "limit": 5}, timeout=_BPM_TIMEOUT_S)
@@ -260,7 +290,7 @@ def deezer_metadata_by_title_artist(title: str, artist: str) -> Dict[str, object
         rows = res.json().get("data", [])
     except Exception as exc:
         log.info("Deezer metadata-by-title lookup failed for %r: %s", term, exc)
-        return {"release_date": None, "popularity": None}
+        return empty
 
     norm_title = title.lower()
     requested_artists = _artist_tokens(artist) if artist else set()
@@ -274,13 +304,21 @@ def deezer_metadata_by_title_artist(title: str, artist: str) -> Dict[str, object
                 continue
         rank = row.get("rank")
         popularity = rank if isinstance(rank, int) else None
+        duration = row.get("duration")
+        duration_seconds = duration if isinstance(duration, int) else None
+        catalog_url = row.get("link") or None
         track_id = row.get("id")
         release_date = None
         if track_id is not None:
             release_date = deezer_track_metadata(str(track_id)).get("release_date")
-        if popularity is not None or release_date is not None:
-            return {"release_date": release_date, "popularity": popularity}
-    return {"release_date": None, "popularity": None}
+        if popularity is not None or release_date is not None or catalog_url is not None:
+            return {
+                "release_date": release_date,
+                "popularity": popularity,
+                "catalog_url": catalog_url,
+                "duration_seconds": duration_seconds,
+            }
+    return empty
 
 
 def search(query: str, genre: Optional[str] = None, limit: int = 8) -> List[Song]:
