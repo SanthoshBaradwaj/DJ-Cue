@@ -1,8 +1,8 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import type { DJStatus, PulseStatus } from "@/lib/types";
-import { GENRES, genreColor } from "./genres";
+import type { DJStatus, EventSettings, PulseStatus } from "@/lib/types";
+import { GENRES, type GenrePick, genreColor } from "./genres";
 import { haptic } from "./motion";
 import PulseChoice from "./PulseChoice";
 import PulseToggle from "./PulseToggle";
@@ -12,14 +12,23 @@ const STATUS_COPY: Record<DJStatus, { label: string; dot: string }> = {
   closed: { label: "Not taking requests", dot: "bg-drop" },
 };
 
+interface Tile {
+  key: string;
+  label: string;
+  accent: string;
+  pick: GenrePick;
+}
+
 /**
  * Screen 1 of the guest flow: one tap, no typing.
  *
- * One flowing grid, not two labeled sections. `GENRES` is already ordered so
- * north/south genres interleave rather than cluster -- there's no "north
- * block, then south block" to read past, no side that visually leads, and
- * moving from a Punjabi tap to a Tamil one is just eye movement across the
- * same grid, not a jump between zones.
+ * The tiles themselves are config-driven: when the DJ has genre_buckets
+ * configured, the guest sees those exact same buckets as buttons -- one
+ * genre picker, not two different taxonomies on two screens. Every event
+ * without bucket config (today's default, and any future DJ who doesn't
+ * want this) falls back to the static 9-genre grid unchanged. `GENRES` is
+ * already ordered so north/south genres interleave rather than cluster in
+ * that fallback -- there's no "north block, then south block" to read past.
  */
 export default function GenreGrid({
   eventLine,
@@ -28,6 +37,7 @@ export default function GenreGrid({
   pulseLimited,
   pulsePending,
   instagramHandle,
+  genreBuckets,
   onPick,
   onPulseChange,
 }: {
@@ -38,13 +48,34 @@ export default function GenreGrid({
   pulsePending?: boolean;
   /** Config-gated -- only rendered when the DJ has set one. */
   instagramHandle?: string | null;
-  onPick: (genreKey: string) => void;
+  /** Config-gated (settings.genre_buckets) -- when present, these render as
+   * the opening tiles instead of the static 9-genre grid. */
+  genreBuckets?: EventSettings["genre_buckets"];
+  onPick: (pick: GenrePick) => void;
   onPulseChange?: (status: PulseStatus) => void;
 }) {
-  const pick = (key: string) => {
+  const pick = (tile: GenrePick) => {
     haptic(12);
-    onPick(key);
+    onPick(tile);
   };
+
+  const tiles: Tile[] =
+    genreBuckets && genreBuckets.length > 0
+      ? genreBuckets.map((b) => {
+          const representative = b.genres[0] ?? "other";
+          return {
+            key: b.label,
+            label: b.label,
+            accent: genreColor(representative),
+            pick: { genre: representative, label: b.label, biasSearch: b.genres.length === 1 },
+          };
+        })
+      : GENRES.map((g) => ({
+          key: g.key,
+          label: g.label,
+          accent: genreColor(g.key),
+          pick: { genre: g.key, label: g.label, biasSearch: true },
+        }));
 
   const status = djStatus ? STATUS_COPY[djStatus] : null;
   const closed = djStatus === "closed";
@@ -122,40 +153,37 @@ export default function GenreGrid({
           <p className="mt-2 text-[15px] text-mist">Pick a genre to get started.</p>
 
           <div className="mt-7 grid grid-cols-2 gap-3">
-            {GENRES.map((g, i) => {
-              const accent = genreColor(g.key);
-              return (
-                <button
-                  key={g.key}
-                  type="button"
-                  onClick={() => pick(g.key)}
-                  style={
-                    {
-                      animationDelay: `${60 + i * 45}ms`,
-                      animationFillMode: "backwards",
-                      "--accent": accent,
-                      borderColor: `color-mix(in oklab, ${accent} 42%, var(--color-ink-line))`,
-                      background: `color-mix(in oklab, ${accent} 13%, var(--color-ink-card))`,
-                    } as CSSProperties
-                  }
-                  className={`tap group/genre relative flex h-24 flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl border px-3 text-center transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-16px_var(--accent)] hover:[border-color:color-mix(in_oklab,var(--accent)_65%,var(--color-ink-line))] hover:[background:color-mix(in_oklab,var(--accent)_20%,var(--color-ink-card))] active:translate-y-0 active:scale-[0.96] active:duration-100 active:[background:color-mix(in_oklab,var(--accent)_28%,var(--color-ink-card))] focus-visible:outline-none focus-visible:ring-2 focus-visible:[--tw-ring-color:var(--accent)] animate-rise ${
-                    // An odd genre count in a 2-column grid leaves one item
-                    // without a partner; give it the full row rather than a
-                    // lopsided gap.
-                    GENRES.length % 2 === 1 && i === GENRES.length - 1 ? "col-span-2" : ""
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-0 left-0 h-[3px] w-full origin-left scale-x-0 transition-transform duration-200 ease-out group-hover/genre:scale-x-100"
-                    style={{ background: accent }}
-                  />
-                  <span className="text-[19px] font-semibold tracking-[-0.01em] text-chalk">
-                    {g.label}
-                  </span>
-                </button>
-              );
-            })}
+            {tiles.map((tile, i) => (
+              <button
+                key={tile.key}
+                type="button"
+                onClick={() => pick(tile.pick)}
+                style={
+                  {
+                    animationDelay: `${60 + i * 45}ms`,
+                    animationFillMode: "backwards",
+                    "--accent": tile.accent,
+                    borderColor: `color-mix(in oklab, ${tile.accent} 42%, var(--color-ink-line))`,
+                    background: `color-mix(in oklab, ${tile.accent} 13%, var(--color-ink-card))`,
+                  } as CSSProperties
+                }
+                className={`tap group/genre relative flex h-24 flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl border px-3 text-center transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-16px_var(--accent)] hover:[border-color:color-mix(in_oklab,var(--accent)_65%,var(--color-ink-line))] hover:[background:color-mix(in_oklab,var(--accent)_20%,var(--color-ink-card))] active:translate-y-0 active:scale-[0.96] active:duration-100 active:[background:color-mix(in_oklab,var(--accent)_28%,var(--color-ink-card))] focus-visible:outline-none focus-visible:ring-2 focus-visible:[--tw-ring-color:var(--accent)] animate-rise ${
+                  // An odd tile count in a 2-column grid leaves one item
+                  // without a partner; give it the full row rather than a
+                  // lopsided gap.
+                  tiles.length % 2 === 1 && i === tiles.length - 1 ? "col-span-2" : ""
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute top-0 left-0 h-[3px] w-full origin-left scale-x-0 transition-transform duration-200 ease-out group-hover/genre:scale-x-100"
+                  style={{ background: tile.accent }}
+                />
+                <span className="text-[19px] font-semibold tracking-[-0.01em] text-chalk">
+                  {tile.label}
+                </span>
+              </button>
+            ))}
           </div>
         </>
       )}

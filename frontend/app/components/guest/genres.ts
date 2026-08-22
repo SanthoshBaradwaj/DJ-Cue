@@ -50,3 +50,22 @@ const DEFAULT_GENRE_COLOR = "#9aa1ac";
 export function genreColor(key: string): string {
   return GENRE_COLOR[key] ?? DEFAULT_GENRE_COLOR;
 }
+
+/**
+ * What a tap on the opening screen actually hands back to the rest of the
+ * guest flow, regardless of whether the tile came from the static 9-genre
+ * grid or a DJ's configured bucket list:
+ * - `genre`: the real genre key stored on the submitted request (so it
+ *   lands in the right DJ dashboard bucket) and used for the trending seed.
+ * - `label`: what the next screen's header shows -- the bucket's own label
+ *   ("South Indian") when in bucket mode, never a narrower key underneath it.
+ * - `biasSearch`: whether catalog search should be nudged toward `genre`.
+ *   False whenever a bucket spans more than one underlying language (e.g.
+ *   "South Indian" = Tamil + Telugu) -- there's no single language to bias
+ *   toward, so search runs unbiased on the typed text alone.
+ */
+export interface GenrePick {
+  genre: string;
+  label: string;
+  biasSearch: boolean;
+}

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { Song, SongRequest } from "@/lib/types";
-import { genreLabel } from "./genres";
 import { haptic } from "./motion";
 import { trendingFor } from "./trending";
 
@@ -39,6 +38,8 @@ function requestToSong(r: SongRequest): Song {
  */
 export default function SongSearch({
   genreKey,
+  displayLabel,
+  biasSearch,
   eventId,
   pending,
   error,
@@ -48,6 +49,14 @@ export default function SongSearch({
   onSubmit,
 }: {
   genreKey: string;
+  /** What the header/empty-state copy shows -- the DJ's bucket label
+   * ("South Indian") when the opening screen is bucket-driven, otherwise the
+   * same as the single genre's own label. Never a narrower key underneath. */
+  displayLabel: string;
+  /** Whether catalog search should be nudged toward `genreKey`. False for a
+   * bucket spanning more than one language -- there's no single language to
+   * bias toward, so search runs on the typed text alone. */
+  biasSearch: boolean;
   eventId?: string | null;
   pending: boolean;
   error: string | null;
@@ -128,7 +137,7 @@ export default function SongSearch({
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await api.searchSongs(q, genreKey, 8);
+        const res = await api.searchSongs(q, biasSearch ? genreKey : undefined, 8);
         setResults(res.songs);
       } catch {
         setResults([]);
@@ -139,7 +148,7 @@ export default function SongSearch({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, genreKey]);
+  }, [query, genreKey, biasSearch]);
 
   const pickSong = (song: Song) => {
     if (blocked) return;
@@ -176,7 +185,7 @@ export default function SongSearch({
         </button>
         <div className="min-w-0">
           <p className="truncate text-[13px] tracking-[0.1em] text-mist/80 uppercase">
-            {genreLabel(genreKey)}
+            {displayLabel}
           </p>
           <h1 className="truncate text-[21px] font-semibold tracking-[-0.02em] text-chalk">
             What song?
@@ -265,7 +274,7 @@ export default function SongSearch({
               </div>
             ) : genreQueue.length === 0 ? (
               <p className="px-1 text-[14px] text-mist/70">
-                Start typing — matches from the {genreLabel(genreKey)} catalog show up here.
+                Start typing — matches from the {displayLabel} catalog show up here.
               </p>
             ) : null}
           </>

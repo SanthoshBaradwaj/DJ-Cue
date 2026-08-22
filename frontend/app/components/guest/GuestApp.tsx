@@ -6,6 +6,7 @@ import type { DJStatus, EventSettings, PulseStatus, RequestAck } from "@/lib/typ
 import Confirmation from "./Confirmation";
 import FirstTimeModal from "./FirstTimeModal";
 import GenreGrid from "./GenreGrid";
+import type { GenrePick } from "./genres";
 import SongSearch from "./SongSearch";
 
 type Step = "genre" | "song" | "confirm";
@@ -29,6 +30,11 @@ export default function GuestApp() {
   const [eventId, setEventId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("genre");
   const [genre, setGenre] = useState<string | null>(null);
+  const [genreDisplayLabel, setGenreDisplayLabel] = useState<string | null>(null);
+  // Nudge catalog search toward `genre`. False when the picked tile was a
+  // multi-language DJ bucket (e.g. "South Indian" = Tamil + Telugu) -- no
+  // single language to bias toward there, so search runs unbiased.
+  const [biasSearch, setBiasSearch] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ack, setAck] = useState<RequestAck | null>(null);
@@ -113,8 +119,10 @@ export default function GuestApp() {
     [eventId, dismissFirstTimeModal],
   );
 
-  const pickGenre = useCallback((key: string) => {
-    setGenre(key);
+  const pickGenre = useCallback((pick: GenrePick) => {
+    setGenre(pick.genre);
+    setGenreDisplayLabel(pick.label);
+    setBiasSearch(pick.biasSearch);
     setError(null);
     setStep("song");
   }, []);
@@ -193,6 +201,7 @@ export default function GuestApp() {
     setAck(null);
     setError(null);
     setGenre(null);
+    setGenreDisplayLabel(null);
     setStep("genre");
   }, []);
 
@@ -229,6 +238,7 @@ export default function GuestApp() {
             pulseLimited={pulseLimited}
             pulsePending={pulsePending}
             instagramHandle={settings?.instagram_handle ?? null}
+            genreBuckets={settings?.genre_buckets}
             onPick={pickGenre}
             onPulseChange={changePulse}
           />
@@ -237,6 +247,8 @@ export default function GuestApp() {
         {step === "song" && genre && (
           <SongSearch
             genreKey={genre}
+            displayLabel={genreDisplayLabel ?? genre}
+            biasSearch={biasSearch}
             eventId={eventId}
             pending={pending}
             error={error}
