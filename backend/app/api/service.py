@@ -273,6 +273,56 @@ class CueService:
             self.broadcast_state(event_id)
         return ack
 
+    def refresh_request_metadata(self, event_id: str, request_id: str) -> Optional[SongRequest]:
+        """Re-attempt catalog resolution for whichever of bpm / release_date /
+        catalog_url / duration_seconds a request is still missing, called
+        when a DJ opens its detail card rather than only once at submit time.
+
+        Submit-time resolution is fail-soft (a slow/flaky Deezer call must
+        never block a guest's request), and a row can also simply predate
+        whichever deploy first started capturing a given field -- either way
+        the gap is otherwise permanent, since nothing ever revisits it. This
+        gives every request a second chance, but only when a DJ actually
+        looks: it's a no-op (no external calls at all) once every field is
+        already filled, so reopening an already-resolved song costs nothing.
+        """
+        current = self.store.get_request(event_id, request_id)
+        if current is None:
+            return None
+        if (
+            current.bpm is not None
+            and current.release_date is not None
+            and current.catalog_url is not None
+            and current.duration_seconds is not None
+        ):
+            return current
+
+        # Same two-path resolution as submit_request: a direct Deezer id
+        # gives an exact track, anything else falls back to a strict
+        # title+artist Deezer lookup.
+        if current.song_id and current.song_id.startswith("deezer:"):
+            deezer_id = current.song_id.split(":", 1)[1]
+            bpm = catalog_search.deezer_track_bpm(deezer_id)
+            detail = catalog_search.deezer_track_metadata(deezer_id)
+        else:
+            bpm = catalog_search.deezer_bpm_by_title_artist(current.song_title, current.song_artist)
+            detail = catalog_search.deezer_metadata_by_title_artist(
+                current.song_title, current.song_artist
+            )
+
+        updated = self.store.refresh_request_metadata(
+            event_id=event_id,
+            request_id=request_id,
+            bpm=bpm,
+            release_date=detail.get("release_date"),
+            popularity=detail.get("popularity"),
+            catalog_url=detail.get("catalog_url"),
+            duration_seconds=detail.get("duration_seconds"),
+        )
+        if updated is not None:
+            self.broadcast_state(event_id)
+        return updated
+
     def set_request_status(
         self, event_id: str, request_id: str, status: str
     ) -> Optional[SongRequest]:

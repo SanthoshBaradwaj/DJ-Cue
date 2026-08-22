@@ -30,6 +30,7 @@ Use `frontend/lib/api.ts` — never hand-roll a fetch.
 | POST | `/api/requests` | `{event_id, session_id, genre, song_title, song_artist?, song_id?, artwork_url?}` | `RequestAck` |
 | GET | `/api/dashboard?event_id=` | — | `DashboardState` |
 | POST | `/api/requests/{id}/status?event_id=` | `{status}` | `SongRequest` |
+| POST | `/api/requests/{id}/refresh?event_id=` | — | `SongRequest` |
 
 `status` (on requests) is one of `"queued" \| "played" \| "dismissed"`.
 Setting `played` or `dismissed` is a **soft delete** — the row leaves the
@@ -42,6 +43,13 @@ while closed regardless of what the client does, and gets `RequestAck` back
 with `request_id: null` and a polite `message`. Every flip is also appended
 to `dj_status_log (event_id, status, changed_at)` for a timeline of when the
 DJ opened/closed the floor.
+
+`/refresh` re-attempts catalog resolution for whichever of `bpm` /
+`release_date` / `catalog_url` / `duration_seconds` a request is still
+missing (submit-time resolution is fail-soft, and a row can predate
+whichever deploy first captured a field) -- a no-op with no external calls
+once every field is already filled. The DJ dashboard calls it when a
+request's detail card is opened.
 
 `pulse` status is `"single" \| "committed"` — optional, guest-set, never
 required, aggregated into `EventStats.pulse_single` / `pulse_committed` /

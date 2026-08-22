@@ -13,6 +13,7 @@ import type {
   RequestAck,
   RequestStatus,
   Song,
+  SongRequest,
   WSMessage,
 } from "./types";
 
@@ -145,6 +146,15 @@ export const api = {
     json<{ id: string; status: string }>(
       `/api/requests/${encodeURIComponent(requestId)}/status?event_id=${encodeURIComponent(eventId)}`,
       { method: "POST", body: JSON.stringify({ status }) },
+    ),
+
+  // Re-attempts catalog resolution for whichever of bpm/release_date/
+  // catalog_url/duration_seconds a request is still missing -- a no-op on
+  // the backend (no external calls) once every field is already filled.
+  refreshRequestMetadata: (requestId: string, eventId: string) =>
+    json<SongRequest>(
+      `/api/requests/${encodeURIComponent(requestId)}/refresh?event_id=${encodeURIComponent(eventId)}`,
+      { method: "POST" },
     ),
 };
 

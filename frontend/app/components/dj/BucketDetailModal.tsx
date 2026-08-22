@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "@/lib/api";
 import type { SongRequest } from "@/lib/types";
 import { genreColor, genreLabel } from "../guest/genres";
 
@@ -28,6 +29,13 @@ function catalogSourceLabel(url: string): string {
  * BPM/release date come up empty, there's still a fast, concrete way to
  * identify the exact recording. Play and Dismiss are repeated here so a DJ
  * who opened this to double-check a song can act without closing it first.
+ *
+ * Opening this also re-attempts catalog resolution for any of those four
+ * fields still missing -- a request can predate whichever deploy first
+ * captured a field, or its one submit-time lookup can simply have missed
+ * (fail-soft on purpose, so a flaky external call never blocks a guest's
+ * request). Refetching only at view time, only for gaps, means this never
+ * spends an API call on a request nobody ever looks at twice.
  */
 export function BucketDetailModal({
   request,
@@ -42,6 +50,8 @@ export function BucketDetailModal({
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const accent = genreColor(request.genre);
+  const [live, setLive] = useState(request);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -54,6 +64,31 @@ export function BucketDetailModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    setLive(request);
+    const missing =
+      request.bpm == null ||
+      request.release_date == null ||
+      request.catalog_url == null ||
+      request.duration_seconds == null;
+    if (!missing) return;
+    let alive = true;
+    setRefreshing(true);
+    api
+      .refreshRequestMetadata(request.id, request.event_id)
+      .then((updated) => {
+        if (alive) setLive(updated);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (alive) setRefreshing(false);
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when a *different* request opens, not on every `live`/`refreshing` update this effect itself causes
+  }, [request.id]);
 
   return (
     <div
@@ -106,18 +141,31 @@ export function BucketDetailModal({
         </div>
 
         <dl className="mt-5 grid grid-cols-2 gap-3">
-          <Field label="Album" value={request.album} />
+          <Field label="Album" value={live.album} />
           <Field
             label="Duration"
-            value={request.duration_seconds ? formatDuration(request.duration_seconds) : null}
+            value={live.duration_seconds ? formatDuration(live.duration_seconds) : null}
+            pending={refreshing && live.duration_seconds == null}
           />
-          <Field label="BPM" value={request.bpm ? String(request.bpm) : null} />
-          <Field label="Release date" value={request.release_date} />
+          <Field
+            label="BPM"
+            value={live.bpm ? String(live.bpm) : null}
+            pending={refreshing && live.bpm == null}
+          />
+          <Field
+            label="Release date"
+            value={live.release_date}
+            pending={refreshing && live.release_date == null}
+          />
           <Field
             label="Vote count"
-            value={`${request.request_count} request${request.request_count === 1 ? "" : "s"}`}
+            value={`${live.request_count} request${live.request_count === 1 ? "" : "s"}`}
           />
-          <LinkField label="Listen" href={request.catalog_url} />
+          <LinkField
+            label="Listen"
+            href={live.catalog_url}
+            pending={refreshing && live.catalog_url == null}
+          />
         </dl>
 
         <div className="mt-6 flex gap-2.5">
@@ -147,7 +195,15 @@ export function BucketDetailModal({
   );
 }
 
-function Field({ label, value }: { label: string; value: string | null }) {
+function Field({
+  label,
+  value,
+  pending,
+}: {
+  label: string;
+  value: string | null;
+  pending?: boolean;
+}) {
   // A bare dash next to real data reads as broken, not "we don't have
   // this" -- a source (usually Deezer, for a track too new or too niche to
   // be in its catalog) genuinely not having a field is expected often
@@ -163,13 +219,21 @@ function Field({ label, value }: { label: string; value: string | null }) {
             : "mt-0.5 truncate text-[15px] font-medium text-mist/50 italic"
         }
       >
-        {known ? value : "Not available"}
+        {known ? value : pending ? "Checking…" : "Not available"}
       </dd>
     </div>
   );
 }
 
-function LinkField({ label, href }: { label: string; href: string | null }) {
+function LinkField({
+  label,
+  href,
+  pending,
+}: {
+  label: string;
+  href: string | null;
+  pending?: boolean;
+}) {
   return (
     <div>
       <dt className="text-[11px] font-medium uppercase tracking-[0.1em] text-mist/60">{label}</dt>
@@ -187,7 +251,9 @@ function LinkField({ label, href }: { label: string; href: string | null }) {
           </svg>
         </a>
       ) : (
-        <dd className="mt-0.5 truncate text-[15px] font-medium text-mist/50 italic">Not available</dd>
+        <dd className="mt-0.5 truncate text-[15px] font-medium text-mist/50 italic">
+          {pending ? "Checking…" : "Not available"}
+        </dd>
       )}
     </div>
   );

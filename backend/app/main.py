@@ -228,6 +228,14 @@ def update_request_status(request_id: str, payload: StatusUpdate, event_id: str 
     return updated.model_dump(mode="json")
 
 
+@app.post("/api/requests/{request_id}/refresh")
+def refresh_request_metadata(request_id: str, event_id: str = Query(...)):
+    updated = get_service().refresh_request_metadata(event_id, request_id)
+    if updated is None:
+        return JSONResponse(status_code=404, content={"detail": "request not found"})
+    return updated.model_dump(mode="json")
+
+
 @app.websocket("/ws/dashboard")
 async def ws_dashboard(websocket: WebSocket, event_id: Optional[str] = None):
     service = get_service()

@@ -181,6 +181,22 @@ class FakeService:
                 return r
         return None
 
+    def refresh_request_metadata(self, event_id, request_id):
+        for r in self.requests.values():
+            if r.id == request_id and r.event_id == event_id:
+                # Same coalesce-only-fills-gaps contract as the real
+                # resolution -- never overwrite a field already present.
+                if r.bpm is None:
+                    r.bpm = 128
+                if r.release_date is None:
+                    r.release_date = "2024-01-01"
+                if r.catalog_url is None:
+                    r.catalog_url = "https://example.com/resolved-track"
+                if r.duration_seconds is None:
+                    r.duration_seconds = 210
+                return r
+        return None
+
 
 def _client(monkeypatch):
     fake = FakeService()
@@ -277,6 +293,38 @@ def test_dismiss_is_a_soft_delete_not_a_row_removal(monkeypatch):
 
     key = (event["id"], "rowdy baby", "")
     assert fake.requests[key].status == "dismissed"  # retained, not deleted
+
+
+def test_refresh_metadata_fills_gaps_without_clobbering_existing_fields(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Refresh Test"}).json()
+    body = {
+        "event_id": event["id"],
+        "session_id": "sess_a",
+        "genre": "punjabi",
+        "song_title": "Morni",
+        "song_artist": "Raf-Saperra & Ikky",
+        "album": "Renaissance - EP",
+    }
+    req = client.post("/api/requests", json=body).json()
+
+    res = client.post(
+        "/api/requests/%s/refresh" % req["request_id"], params={"event_id": event["id"]}
+    )
+    assert res.status_code == 200
+    updated = res.json()
+    assert updated["album"] == "Renaissance - EP"  # untouched, already had a value
+    assert updated["bpm"] == 128
+    assert updated["release_date"] == "2024-01-01"
+    assert updated["catalog_url"] == "https://example.com/resolved-track"
+    assert updated["duration_seconds"] == 210
+
+
+def test_refresh_metadata_404s_for_unknown_request(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Refresh 404"}).json()
+    res = client.post("/api/requests/nope/refresh", params={"event_id": event["id"]})
+    assert res.status_code == 404
 
 
 def test_empty_song_title_rejected(monkeypatch):

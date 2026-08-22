@@ -274,6 +274,49 @@ class Store:
             message=message,
         )
 
+    def get_request(self, event_id: str, request_id: str) -> Optional[SongRequest]:
+        res = _exec(
+            lambda: self.client.table("requests")
+            .select("*")
+            .eq("event_id", event_id)
+            .eq("id", request_id)
+            .limit(1)
+        )
+        rows = res.data or []
+        return _row_to_request(rows[0]) if rows else None
+
+    def refresh_request_metadata(
+        self,
+        event_id: str,
+        request_id: str,
+        bpm: Optional[int] = None,
+        album: Optional[str] = None,
+        release_date: Optional[str] = None,
+        popularity: Optional[int] = None,
+        catalog_url: Optional[str] = None,
+        duration_seconds: Optional[int] = None,
+    ) -> Optional[SongRequest]:
+        # Same COALESCE-only-fills-gaps contract as the submit-time backfill
+        # -- this can never clobber a field the row already has, it only
+        # ever fills one that's still null.
+        res = _exec(
+            lambda: self.client.rpc(
+                "refresh_request_metadata",
+                {
+                    "p_event_id": event_id,
+                    "p_request_id": request_id,
+                    "p_bpm": bpm,
+                    "p_album": album,
+                    "p_release_date": release_date,
+                    "p_popularity": popularity,
+                    "p_catalog_url": catalog_url,
+                    "p_duration_seconds": duration_seconds,
+                },
+            )
+        )
+        rows = res.data or []
+        return _row_to_request(rows[0]) if rows else None
+
     def queued_requests(self, event_id: str) -> List[SongRequest]:
         res = _exec(
             lambda: self.client.table("requests")
