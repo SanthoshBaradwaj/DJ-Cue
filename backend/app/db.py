@@ -38,6 +38,13 @@ log = logging.getLogger("cue.db")
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
+# The one permanent test event /present's dev-mode toggle points at (see
+# CueService.get_or_create_dev_event). It must never be reachable by
+# ordinary guest traffic that lands with no explicit ?event= -- see
+# latest_active_event() below, which excludes it by slug for exactly that
+# reason.
+DEV_EVENT_SLUG = "dj-cue-dev-test"
+
 
 def slugify(name: str) -> str:
     base = _SLUG_RE.sub("-", name.strip().lower()).strip("-")
@@ -161,10 +168,16 @@ class Store:
         return _row_to_event(rows[0]) if rows else None
 
     def latest_active_event(self) -> Optional[Event]:
+        # Guest traffic with no explicit ?event= lands here -- the dev/test
+        # event must never win this, or the app's own public URL silently
+        # starts serving throwaway test config to every real guest the
+        # moment someone creates a dev event with a newer created_at than
+        # the real one (exactly what happened in production once).
         res = _exec(
             lambda: self.client.table("events")
             .select("*")
             .eq("status", "active")
+            .neq("slug", DEV_EVENT_SLUG)
             .order("created_at", desc=True)
             .limit(1)
         )

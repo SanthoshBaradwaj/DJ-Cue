@@ -27,7 +27,7 @@ from ..contracts import (
     SongRequest,
     WSMessage,
 )
-from ..db import get_store
+from ..db import DEV_EVENT_SLUG, get_store
 from ..events import bus
 
 log = logging.getLogger("cue.service")
@@ -122,12 +122,13 @@ class CueService:
     # create-on-every-call -- create_event() de-dupes slugs by appending
     # -2, -3, so calling it with the same name repeatedly would otherwise
     # spawn a fresh "dev" event on every request. One permanent event to
-    # test against, safe to flush as often as needed, never the real one.
-    DEV_EVENT_SLUG = "dj-cue-dev-test"
+    # test against, safe to flush as often as needed, never the real one --
+    # DEV_EVENT_SLUG lives in db.py because latest_active_event() also
+    # needs it, to exclude this event from ordinary guest resolution.
     DEV_EVENT_NAME = "DJ-Cue Dev/Test"
 
     def get_or_create_dev_event(self) -> Event:
-        event = self.store.get_event_by_slug(self.DEV_EVENT_SLUG)
+        event = self.store.get_event_by_slug(DEV_EVENT_SLUG)
         if event is not None:
             return event
         return self.store.create_event(self.DEV_EVENT_NAME)
