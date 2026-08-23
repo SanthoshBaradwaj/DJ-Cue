@@ -62,25 +62,35 @@ export function sessionId(): string {
   return id;
 }
 
-const PIN_KEY = "cue_operator_pin";
+export type PinRole = "dj" | "present";
 
-/** The one shared operator PIN, gating /dj and /present plus every DJ-only
- * write server-side (see backend/app/main.py's require_operator_pin).
- * sessionStorage, not localStorage -- a shared venue laptop or a TV browser
- * left logged in shouldn't stay unlocked across a completely different day. */
-export function getOperatorPin(): string | null {
+const PIN_KEYS: Record<PinRole, string> = {
+  dj: "cue_dj_pin",
+  present: "cue_present_pin",
+};
+const PIN_HEADERS: Record<PinRole, string> = {
+  dj: "X-Dj-Pin",
+  present: "X-Present-Pin",
+};
+
+/** Two independent operator PINs -- one for /dj, one for /present -- so the
+ * two roles can be handed out separately (see backend/app/main.py's
+ * require_dj_pin / require_present_pin). sessionStorage, not localStorage:
+ * a shared venue laptop or a TV browser left open shouldn't stay unlocked
+ * across a completely different day. */
+export function getPin(role: PinRole): string | null {
   if (typeof window === "undefined") return null;
-  return window.sessionStorage.getItem(PIN_KEY);
+  return window.sessionStorage.getItem(PIN_KEYS[role]);
 }
 
-export function setOperatorPin(pin: string): void {
+export function setPin(role: PinRole, pin: string): void {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(PIN_KEY, pin);
+  window.sessionStorage.setItem(PIN_KEYS[role], pin);
 }
 
-export function clearOperatorPin(): void {
+export function clearPin(role: PinRole): void {
   if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(PIN_KEY);
+  window.sessionStorage.removeItem(PIN_KEYS[role]);
 }
 
 export class ApiError extends Error {
@@ -92,14 +102,17 @@ export class ApiError extends Error {
 }
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
-  const pin = getOperatorPin();
+  const djPin = getPin("dj");
+  const presentPin = getPin("present");
   const res = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      // Harmless on every guest-facing route -- the backend only checks
-      // this header on the handful of DJ-only writes that declare it.
-      ...(pin ? { "X-Operator-Pin": pin } : {}),
+      // Harmless on every route that doesn't check it -- the backend only
+      // checks the one header relevant to each DJ-only/presenter-only
+      // write, and no endpoint checks both.
+      ...(djPin ? { [PIN_HEADERS.dj]: djPin } : {}),
+      ...(presentPin ? { [PIN_HEADERS.present]: presentPin } : {}),
       ...(init?.headers || {}),
     },
   });
@@ -119,10 +132,10 @@ export const api = {
     ),
 
   auth: {
-    verifyPin: (pin: string) =>
+    verifyPin: (pin: string, role: PinRole) =>
       json<{ ok: boolean }>("/api/auth/verify-pin", {
         method: "POST",
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin, role }),
       }),
   },
 

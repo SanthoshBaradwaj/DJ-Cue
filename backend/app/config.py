@@ -53,16 +53,19 @@ class Settings:
     # fast thumb from firing off five requests in two seconds.
     submit_cooldown_s: float = float(os.environ.get("CUE_SUBMIT_COOLDOWN", "2.5"))
 
-    # --- operator PIN ---
+    # --- operator PINs ---
     # There are no accounts anywhere in this app -- guests are anonymous and
     # the DJ dashboard never had a login either -- but /dj and /present are
     # both reachable by anyone with the URL, and /present in particular can
-    # flush an event's live data. This one shared PIN (not a per-person
-    # account, there's only ever one operator) gates the dashboard pages
-    # client-side and every DJ-only write server-side, so finding the API
-    # path in devtools doesn't bypass it. "3006" is an explicit placeholder
-    # -- override with CUE_OPERATOR_PIN before a real event.
-    operator_pin: str = os.environ.get("CUE_OPERATOR_PIN", "3006")
+    # flush an event's live data. Two separate PINs (not one shared secret)
+    # so the two roles -- the DJ working the queue, whoever's running the
+    # presenter laptop -- can be handed out independently. Each gates its
+    # own page client-side and its own DJ-only writes server-side (see
+    # require_dj_pin / require_present_pin in main.py), so finding the API
+    # path in devtools doesn't bypass it. Both are explicit placeholders --
+    # override with CUE_DJ_PIN / CUE_PRESENT_PIN before a real event.
+    dj_pin: str = os.environ.get("CUE_DJ_PIN", "3699")
+    present_pin: str = os.environ.get("CUE_PRESENT_PIN", "3006")
 
     @property
     def has_supabase(self) -> bool:

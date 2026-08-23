@@ -24,7 +24,7 @@ type Env = "prod" | "dev";
 
 export default function PresentPage() {
   return (
-    <PinGate>
+    <PinGate role="present">
       <Present />
     </PinGate>
   );

@@ -29,7 +29,7 @@ const DEV_EVENT_SLUG = "dj-cue-dev-test";
 
 export default function DJDashboardPage() {
   return (
-    <PinGate>
+    <PinGate role="dj">
       <DJDashboard />
     </PinGate>
   );

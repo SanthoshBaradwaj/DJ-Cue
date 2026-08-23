@@ -5,9 +5,10 @@
 CORS is fully permissive on purpose: guests hit this from arbitrary phones on
 a venue LAN, and there is nothing to protect on the guest side -- no
 accounts, no personal data, just an anonymous session id and a song title.
-The DJ-only write endpoints are the exception: they sit behind one shared
-operator PIN (see require_operator_pin below), since a request-queue reset
-button is real damage a stranger with the URL shouldn't be able to trigger.
+The DJ-only write endpoints are the exception: they sit behind one of two
+role-scoped operator PINs (see require_dj_pin / require_present_pin below),
+since a request-queue reset button is real damage a stranger with the URL
+shouldn't be able to trigger.
 """
 
 from __future__ import annotations
@@ -41,13 +42,21 @@ from .events import bus
 from .genres import GENRES
 
 
-def require_operator_pin(x_operator_pin: Optional[str] = Header(default=None)) -> None:
-    """Gate for every DJ-only write. Checked server-side, not just hidden
-    behind a client-side page gate -- the PIN travels as a header the
-    frontend attaches automatically once entered, so finding the route in
-    devtools doesn't bypass it the way a UI-only gate would."""
-    if not x_operator_pin or x_operator_pin != settings.operator_pin:
-        raise HTTPException(status_code=401, detail="missing or incorrect operator PIN")
+def require_dj_pin(x_dj_pin: Optional[str] = Header(default=None)) -> None:
+    """Gate for /dj's own writes (dj_status, request status, metadata
+    refresh). Checked server-side, not just hidden behind a client-side page
+    gate -- the PIN travels as a header the frontend attaches automatically
+    once entered, so finding the route in devtools doesn't bypass it the way
+    a UI-only gate would."""
+    if not x_dj_pin or x_dj_pin != settings.dj_pin:
+        raise HTTPException(status_code=401, detail="missing or incorrect DJ PIN")
+
+
+def require_present_pin(x_present_pin: Optional[str] = Header(default=None)) -> None:
+    """Gate for /present's own write (the event flush) -- same contract as
+    require_dj_pin, just the presenter's own separate PIN."""
+    if not x_present_pin or x_present_pin != settings.present_pin:
+        raise HTTPException(status_code=401, detail="missing or incorrect presenter PIN")
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
@@ -151,14 +160,15 @@ def dev_event():
 
 @app.post("/api/auth/verify-pin")
 def verify_pin(payload: PinVerify):
-    if payload.pin != settings.operator_pin:
+    expected = settings.dj_pin if payload.role == "dj" else settings.present_pin
+    if payload.pin != expected:
         return JSONResponse(status_code=401, content={"detail": "incorrect PIN"})
     return {"ok": True}
 
 
 @app.post("/api/events/{event_id}/status")
 def update_dj_status(
-    event_id: str, payload: DJStatusUpdate, _auth: None = Depends(require_operator_pin)
+    event_id: str, payload: DJStatusUpdate, _auth: None = Depends(require_dj_pin)
 ):
     if payload.status not in ("open", "closed"):
         return JSONResponse(status_code=422, content={"detail": "unknown dj status"})
@@ -169,7 +179,7 @@ def update_dj_status(
 
 
 @app.post("/api/events/{event_id}/flush")
-def flush_event(event_id: str, _auth: None = Depends(require_operator_pin)):
+def flush_event(event_id: str, _auth: None = Depends(require_present_pin)):
     ack = get_service().flush_event(event_id)
     return ack.model_dump(mode="json")
 
@@ -261,7 +271,7 @@ def update_request_status(
     request_id: str,
     payload: StatusUpdate,
     event_id: str = Query(...),
-    _auth: None = Depends(require_operator_pin),
+    _auth: None = Depends(require_dj_pin),
 ):
     if payload.status not in ("played", "dismissed", "queued"):
         return JSONResponse(status_code=422, content={"detail": "unknown status"})
@@ -273,7 +283,7 @@ def update_request_status(
 
 @app.post("/api/requests/{request_id}/refresh")
 def refresh_request_metadata(
-    request_id: str, event_id: str = Query(...), _auth: None = Depends(require_operator_pin)
+    request_id: str, event_id: str = Query(...), _auth: None = Depends(require_dj_pin)
 ):
     updated = get_service().refresh_request_metadata(event_id, request_id)
     if updated is None:

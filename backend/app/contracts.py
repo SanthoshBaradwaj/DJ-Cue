@@ -236,6 +236,7 @@ class StatusUpdate(BaseModel):
 
 class PinVerify(BaseModel):
     pin: str
+    role: str  # "dj" | "present" -- which of the two operator PINs this is checked against
 
 
 class FlushAck(BaseModel):

@@ -25,33 +25,39 @@ Use `frontend/lib/api.ts` — never hand-roll a fetch.
 | GET | `/api/events` | — | `{events: Event[]}` |
 | POST | `/api/events` | `{name}` | `Event` |
 | GET | `/api/events/dev` | — | `Event` |
-| POST | `/api/auth/verify-pin` | `{pin}` | `{ok: true}` (401 if wrong) |
-| POST | `/api/events/{id}/status` 🔒 | `{status}` | `Event` |
+| POST | `/api/auth/verify-pin` | `{pin, role}` | `{ok: true}` (401 if wrong) |
+| POST | `/api/events/{id}/status` 🔒dj | `{status}` | `Event` |
 | POST | `/api/events/{id}/pulse` | `{session_id, status}` | `PulseAck` |
-| POST | `/api/events/{id}/flush` 🔒 | — | `FlushAck` |
+| POST | `/api/events/{id}/flush` 🔒present | — | `FlushAck` |
 | GET | `/api/catalog/search?q=&genre=&limit=` | — | `{songs: Song[]}` |
 | POST | `/api/requests` | `{event_id, session_id, genre, song_title, song_artist?, song_id?, artwork_url?}` | `RequestAck` |
 | GET | `/api/dashboard?event_id=` | — | `DashboardState` |
-| POST | `/api/requests/{id}/status?event_id=` 🔒 | `{status}` | `SongRequest` |
-| POST | `/api/requests/{id}/refresh?event_id=` 🔒 | — | `SongRequest` |
+| POST | `/api/requests/{id}/status?event_id=` 🔒dj | `{status}` | `SongRequest` |
+| POST | `/api/requests/{id}/refresh?event_id=` 🔒dj | — | `SongRequest` |
 
-🔒 = requires the `X-Operator-Pin` header (see below). `frontend/lib/api.ts`
-attaches it automatically once `setOperatorPin` has been called — every
-other call site is a plain `api.*` call, no special handling needed.
+🔒dj = requires the `X-Dj-Pin` header. 🔒present = requires `X-Present-Pin`.
+See below. `frontend/lib/api.ts` attaches whichever of the two is currently
+stored automatically once `setPin(role, pin)` has been called for that role
+— every other call site is a plain `api.*` call, no special handling needed.
 
-## Operator PIN
+## Operator PINs
 
 `/dj` and `/present` are both reachable by anyone with the URL, and
 `/present`'s reset button is a hard delete of live event data — so every
-DJ-only *write* also requires one shared operator PIN, checked server-side
-(`require_operator_pin` in `main.py`) against `CUE_OPERATOR_PIN` (default
-`"3006"`, an explicit placeholder — override before a real event), not just
-hidden behind a client-side gate. Guest-facing routes (search, submit,
-pulse, first-time-answer, config) never require it — gating those would
-break the core product. `frontend/app/components/shared/PinGate.tsx` wraps
-both pages: it verifies a `sessionStorage`-cached PIN via `/api/auth/verify-pin`
-on load, or prompts for one, then every subsequent `api.*` call attaches it
-automatically via the `X-Operator-Pin` header.
+DJ-only *write* also requires one of two independent operator PINs, checked
+server-side (`require_dj_pin` / `require_present_pin` in `main.py`) against
+`CUE_DJ_PIN` (default `"3699"`) / `CUE_PRESENT_PIN` (default `"3006"`) —
+explicit placeholders, override before a real event — not just hidden
+behind a client-side gate. The two roles are fully independent: the DJ pin
+doesn't work on `/flush`, the presenter pin doesn't work on any `/dj`
+write, and unlocking one page in a browser doesn't unlock the other.
+Guest-facing routes (search, submit, pulse, first-time-answer, config)
+never require either — gating those would break the core product.
+`frontend/app/components/shared/PinGate.tsx` wraps both pages with a `role`
+prop (`"dj"` | `"present"`): it verifies a `sessionStorage`-cached PIN for
+that role via `/api/auth/verify-pin` on load, or prompts for one, then
+every subsequent `api.*` call attaches whichever of the two PINs are
+currently stored via `X-Dj-Pin` / `X-Present-Pin`.
 
 `/api/events/dev` is find-or-create (slug `dj-cue-dev-test`) and not
 PIN-gated — reading or lazily creating one inert test event isn't itself
