@@ -19,6 +19,13 @@ import { useFlipReorder } from "../components/dj/useFlipReorder";
 import { PinGate } from "../components/shared/PinGate";
 
 const ACTIVE_EVENT_KEY = "cue_dj_active_event";
+// Same event backend/app/db.py's DEV_EVENT_SLUG guards against for guest
+// resolution -- it also has the newest created_at of any active event, so
+// without this a fresh browser with no stored preference (a new laptop, a
+// cleared cache) would silently default the whole dashboard to the empty
+// dev event instead of the real one. Still fully selectable from the
+// dropdown -- events.list() isn't filtered, just this fallback pick.
+const DEV_EVENT_SLUG = "dj-cue-dev-test";
 
 export default function DJDashboardPage() {
   return (
@@ -45,6 +52,8 @@ function DJDashboard() {
       typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_EVENT_KEY) : null;
     if (stored && list.some((e) => e.id === stored)) {
       setActiveEventId(stored);
+    } else if (list.some((e) => e.slug !== DEV_EVENT_SLUG)) {
+      setActiveEventId(list.find((e) => e.slug !== DEV_EVENT_SLUG)!.id);
     } else if (list.length > 0) {
       setActiveEventId(list[0].id);
     } else {
