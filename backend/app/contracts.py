@@ -31,6 +31,14 @@ class GenreBucket(BaseModel):
     label: str
     genres: List[str]
     slots: int
+    # Optional hex override for the guest tile's accent color. Absent by
+    # default, in which case the tile derives its color from
+    # genreColor(genres[0]) same as always -- this only exists because a
+    # bucket's color and its representative genre (which also drives
+    # search-bias and dashboard routing) aren't always the color a DJ wants
+    # together, and genres[0] can't be swapped for a different color without
+    # picking a genre outside the bucket's own list.
+    accent: Optional[str] = None
 
 
 class EventSettings(BaseModel):

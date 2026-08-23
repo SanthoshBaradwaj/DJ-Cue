@@ -67,17 +67,17 @@ export function RequestRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[16px] font-semibold text-chalk">{request.song_title}</p>
-        <p className="mt-0.5 flex min-w-0 items-center gap-2 truncate text-[13px] text-mist">
+        <p className="truncate text-[18px] font-semibold text-chalk">{request.song_title}</p>
+        <p className="mt-0.5 flex min-w-0 items-center gap-2 truncate text-[15px] text-mist">
           {request.song_artist ? <span className="truncate">{request.song_artist}</span> : null}
           {request.genre ? (
-            <span className="shrink-0 rounded-full border border-ink-line px-2 py-0.5 text-[11px] uppercase tracking-[0.08em] text-mist/80">
+            <span className="shrink-0 rounded-full border border-ink-line px-2 py-0.5 text-[13px] uppercase tracking-[0.08em] text-mist/80">
               {genreLabel(request.genre)}
             </span>
           ) : null}
           {request.bpm ? (
             <span
-              className="tnum shrink-0 rounded-full border border-ink-line px-2 py-0.5 text-[11px] uppercase tracking-[0.08em] text-mist/80"
+              className="tnum shrink-0 rounded-full border border-ink-line px-2 py-0.5 text-[13px] uppercase tracking-[0.08em] text-mist/80"
               title="Tempo, from Deezer's catalog data"
             >
               {request.bpm} BPM
@@ -87,7 +87,7 @@ export function RequestRow({
       </div>
 
       <div
-        className="tnum flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[14px] font-bold sm:px-3 sm:text-[15px]"
+        className="tnum flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[16px] font-bold sm:px-3 sm:text-[17px]"
         style={{
           background: hot
             ? "color-mix(in oklab, var(--color-cue-1) 16%, transparent)"
@@ -117,7 +117,7 @@ export function RequestRow({
           type="button"
           onClick={onPlayed}
           aria-label="Mark as played"
-          className="tap group flex h-11 items-center gap-1.5 rounded-xl border border-transparent bg-go/15 px-2.5 text-[13px] font-bold text-go transition-all duration-150 hover:scale-105 hover:border-go/40 hover:bg-go/25 hover:shadow-[0_10px_28px_-12px_var(--color-go)] active:scale-95 active:bg-go/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70 sm:px-3.5"
+          className="tap group flex h-11 items-center gap-1.5 rounded-xl border border-transparent bg-go/15 px-2.5 text-[15px] font-bold text-go transition-all duration-150 hover:scale-105 hover:border-go/40 hover:bg-go/25 hover:shadow-[0_10px_28px_-12px_var(--color-go)] active:scale-95 active:bg-go/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70 sm:px-3.5"
         >
           <svg
             viewBox="0 0 12 12"

@@ -21,6 +21,9 @@ export interface GenreBucket {
   label: string;
   genres: string[];
   slots: number;
+  /** Optional hex override for the guest tile's accent -- null means derive
+   * it from genreColor(genres[0]) as always. */
+  accent: string | null;
 }
 
 /** Per-event configuration, entirely opt-in. Every field defaults to "off"

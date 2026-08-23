@@ -68,7 +68,9 @@ export default function PulseChoice({
 
   return (
     <div className="mt-6">
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-mist">Tap your vibe</p>
+      <p className="text-center text-[28px] leading-[1.15] font-semibold tracking-[-0.02em] text-chalk">
+        Tap your vibe
+      </p>
       <div
         role="group"
         aria-label="Crowd pulse: single or committed"

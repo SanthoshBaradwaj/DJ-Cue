@@ -8,7 +8,7 @@ import PulseChoice from "./PulseChoice";
 import PulseToggle from "./PulseToggle";
 
 const STATUS_COPY: Record<DJStatus, { label: string; dot: string }> = {
-  open: { label: "Taking requests", dot: "bg-go" },
+  open: { label: "🔛", dot: "bg-go" },
   closed: { label: "Not taking requests", dot: "bg-drop" },
 };
 
@@ -66,7 +66,11 @@ export default function GenreGrid({
           return {
             key: b.label,
             label: b.label,
-            accent: genreColor(representative),
+            // An explicit accent lets a DJ pick a bucket's tile color
+            // independent of which genre happens to be genres[0] -- that
+            // genre still drives search bias and dashboard routing, this
+            // only overrides the color derived from it.
+            accent: b.accent ?? genreColor(representative),
             pick: { genre: representative, label: b.label, biasSearch: b.genres.length === 1 },
           };
         })
@@ -83,7 +87,7 @@ export default function GenreGrid({
   return (
     <div className="flex flex-col animate-rise">
       <header className="flex items-center justify-between gap-3">
-        <span className="shrink-0 bg-gradient-to-r from-cue-1 via-cue-2 to-cue-3 bg-clip-text text-[15px] font-bold tracking-[0.42em] text-transparent">
+        <span className="shrink-0 bg-gradient-to-r from-cue-1 via-cue-2 to-cue-3 bg-clip-text text-[21px] font-bold tracking-[0.42em] text-transparent">
           DJ-CUE
         </span>
         <div className="flex min-w-0 items-center gap-2.5">
@@ -156,10 +160,9 @@ export default function GenreGrid({
         </div>
       ) : (
         <>
-          <h1 className="mt-7 text-[28px] leading-[1.15] font-semibold tracking-[-0.02em] text-chalk">
-            Request your favourites
+          <h1 className="mt-7 text-center text-[28px] leading-[1.15] font-semibold tracking-[-0.02em] text-chalk">
+            Request your song
           </h1>
-          <p className="mt-2 text-[15px] text-mist">Pick a genre to get started.</p>
 
           <div className="mt-7 grid grid-cols-2 gap-3">
             {tiles.map((tile, i) => (

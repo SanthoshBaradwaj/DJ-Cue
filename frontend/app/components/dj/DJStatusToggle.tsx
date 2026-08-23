@@ -5,7 +5,7 @@ import type { DJStatus } from "@/lib/types";
 const ORDER: DJStatus[] = ["open", "closed"];
 
 const COPY: Record<DJStatus, { label: string; color: string }> = {
-  open: { label: "Taking requests", color: "var(--color-go)" },
+  open: { label: "🔛", color: "var(--color-go)" },
   closed: { label: "Not taking requests", color: "var(--color-drop)" },
 };
 
@@ -39,7 +39,7 @@ export function DJStatusToggle({
       disabled={busy}
       title="Tap to change what guests see"
       aria-label={`Guest-facing status: ${copy.label}. Tap to change.`}
-      className="tap flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-bold transition-transform active:scale-95 disabled:opacity-60"
+      className="tap flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[14px] font-bold transition-transform active:scale-95 disabled:opacity-60"
       style={{
         borderColor: `color-mix(in oklab, ${copy.color} 40%, transparent)`,
         background: `color-mix(in oklab, ${copy.color} 12%, transparent)`,

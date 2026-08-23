@@ -21,7 +21,7 @@ export const GENRES: Genre[] = [
   // Catch-all so a guest whose song doesn't fit any bucket above can still
   // request it. Last on purpose -- it's the fallback, not a fifth option
   // worth equal billing with the rest of the grid.
-  { key: "other", label: "Other genre", region: "other" },
+  { key: "other", label: "More", region: "other" },
 ];
 
 export function genreLabel(key: string): string {

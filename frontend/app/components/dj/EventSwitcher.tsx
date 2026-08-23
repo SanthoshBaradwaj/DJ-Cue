@@ -25,7 +25,7 @@ export default function EventSwitcher({
     <select
       value={activeEventId ?? ""}
       onChange={(e) => onSelect(e.target.value)}
-      className="h-10 min-w-0 flex-1 rounded-lg border border-ink-line bg-ink-raised px-2.5 text-[13px] font-medium text-chalk outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70 sm:h-9 sm:max-w-[13rem] sm:flex-none"
+      className="h-10 min-w-0 flex-1 rounded-lg border border-ink-line bg-ink-raised px-2.5 text-[15px] font-medium text-chalk outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70 sm:h-9 sm:max-w-[13rem] sm:flex-none"
     >
       {events.map((e) => (
         <option key={e.id} value={e.id}>

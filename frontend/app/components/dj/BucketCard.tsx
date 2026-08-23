@@ -22,7 +22,7 @@ export function BucketCard({
 }) {
   if (!request) {
     return (
-      <div className="flex h-[4.25rem] items-center justify-center rounded-xl border border-dashed border-ink-line/70 px-3 text-[12px] text-mist/50">
+      <div className="flex h-[4.25rem] items-center justify-center rounded-xl border border-dashed border-ink-line/70 px-3 text-[14px] text-mist/50">
         Empty slot
       </div>
     );
@@ -50,16 +50,16 @@ export function BucketCard({
       />
 
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold text-chalk">
+        <span className="block truncate text-[16px] font-semibold text-chalk">
           {request.song_title}
         </span>
         {request.song_artist ? (
-          <span className="block truncate text-[12px] text-mist">{request.song_artist}</span>
+          <span className="block truncate text-[14px] text-mist">{request.song_artist}</span>
         ) : null}
       </span>
 
       <span
-        className="tnum shrink-0 rounded-full px-2 py-1 text-[12px] font-bold"
+        className="tnum shrink-0 rounded-full px-2 py-1 text-[14px] font-bold"
         style={{
           background: hot
             ? "color-mix(in oklab, var(--color-cue-1) 16%, transparent)"

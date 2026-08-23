@@ -107,7 +107,7 @@ export function BucketDetailModal({
           <div className="min-w-0">
             {request.genre && (
               <span
-                className="mb-1.5 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]"
+                className="mb-1.5 inline-block rounded-full px-2.5 py-0.5 text-[13px] font-semibold uppercase tracking-[0.08em]"
                 style={{
                   background: `color-mix(in oklab, ${accent} 18%, transparent)`,
                   color: accent,
@@ -120,12 +120,12 @@ export function BucketDetailModal({
               id="bucket-detail-heading"
               ref={headingRef}
               tabIndex={-1}
-              className="text-[22px] leading-[1.25] font-semibold tracking-[-0.02em] text-chalk outline-none"
+              className="text-[25px] leading-[1.25] font-semibold tracking-[-0.02em] text-chalk outline-none"
             >
               {request.song_title}
             </h2>
             {request.song_artist ? (
-              <p className="mt-0.5 text-[15px] text-mist">{request.song_artist}</p>
+              <p className="mt-0.5 text-[17px] text-mist">{request.song_artist}</p>
             ) : null}
           </div>
           <button
@@ -172,7 +172,7 @@ export function BucketDetailModal({
           <button
             type="button"
             onClick={onPlayed}
-            className="tap flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-go/15 text-[15px] font-bold text-go transition-all duration-150 active:scale-[0.985] active:bg-go/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70"
+            className="tap flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-go/15 text-[17px] font-bold text-go transition-all duration-150 active:scale-[0.985] active:bg-go/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-go/70"
           >
             <svg viewBox="0 0 12 12" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
               <path d="M3 1.8v8.4L10 6z" fill="currentColor" />
@@ -211,12 +211,12 @@ function Field({
   const known = value != null && value !== "";
   return (
     <div>
-      <dt className="text-[11px] font-medium uppercase tracking-[0.1em] text-mist/60">{label}</dt>
+      <dt className="text-[13px] font-medium uppercase tracking-[0.1em] text-mist/60">{label}</dt>
       <dd
         className={
           known
-            ? "mt-0.5 truncate text-[15px] font-medium text-chalk"
-            : "mt-0.5 truncate text-[15px] font-medium text-mist/50 italic"
+            ? "mt-0.5 truncate text-[17px] font-medium text-chalk"
+            : "mt-0.5 truncate text-[17px] font-medium text-mist/50 italic"
         }
       >
         {known ? value : pending ? "Checking…" : "Not available"}
@@ -236,14 +236,14 @@ function LinkField({
 }) {
   return (
     <div>
-      <dt className="text-[11px] font-medium uppercase tracking-[0.1em] text-mist/60">{label}</dt>
+      <dt className="text-[13px] font-medium uppercase tracking-[0.1em] text-mist/60">{label}</dt>
       {href ? (
         <a
           href={href}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="tap mt-0.5 inline-flex items-center gap-1 truncate text-[15px] font-medium text-cue-1 underline decoration-cue-1/40 underline-offset-2 transition-colors active:text-cue-2"
+          className="tap mt-0.5 inline-flex items-center gap-1 truncate text-[17px] font-medium text-cue-1 underline decoration-cue-1/40 underline-offset-2 transition-colors active:text-cue-2"
         >
           {catalogSourceLabel(href)}
           <svg viewBox="0 0 12 12" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -251,7 +251,7 @@ function LinkField({
           </svg>
         </a>
       ) : (
-        <dd className="mt-0.5 truncate text-[15px] font-medium text-mist/50 italic">
+        <dd className="mt-0.5 truncate text-[17px] font-medium text-mist/50 italic">
           {pending ? "Checking…" : "Not available"}
         </dd>
       )}
