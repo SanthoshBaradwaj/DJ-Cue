@@ -5,8 +5,12 @@ import type { DJStatus } from "@/lib/types";
 const ORDER: DJStatus[] = ["open", "closed"];
 
 const COPY: Record<DJStatus, { label: string; color: string }> = {
-  open: { label: "🔛", color: "var(--color-go)" },
-  closed: { label: "Not taking requests", color: "var(--color-drop)" },
+  open: { label: "🙂", color: "var(--color-go)" },
+  closed: { label: "🙁", color: "var(--color-drop)" },
+};
+const STATUS_TEXT: Record<DJStatus, string> = {
+  open: "taking requests",
+  closed: "not taking requests",
 };
 
 /**
@@ -38,8 +42,8 @@ export function DJStatusToggle({
       onClick={advance}
       disabled={busy}
       title="Tap to change what guests see"
-      aria-label={`Guest-facing status: ${copy.label}. Tap to change.`}
-      className="tap flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[14px] font-bold transition-transform active:scale-95 disabled:opacity-60"
+      aria-label={`Guest-facing status: ${STATUS_TEXT[status]}. Tap to change.`}
+      className="tap flex h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 transition-transform active:scale-95 disabled:opacity-60"
       style={{
         borderColor: `color-mix(in oklab, ${copy.color} 40%, transparent)`,
         background: `color-mix(in oklab, ${copy.color} 12%, transparent)`,
@@ -47,7 +51,9 @@ export function DJStatusToggle({
       }}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: copy.color }} aria-hidden="true" />
-      {copy.label}
+      <span role="img" aria-hidden="true" className="text-[24px] leading-none">
+        {copy.label}
+      </span>
     </button>
   );
 }

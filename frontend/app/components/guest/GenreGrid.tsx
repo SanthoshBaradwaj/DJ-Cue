@@ -7,9 +7,13 @@ import { haptic } from "./motion";
 import PulseChoice from "./PulseChoice";
 import PulseToggle from "./PulseToggle";
 
+// Read-only here -- only the DJ's own toggle (DJStatusToggle, in the DJ
+// dashboard) can ever flip this. A happy face when the DJ's taking
+// requests, a sad one when they've paused -- the same pair DJStatusToggle
+// uses, so a guest and the DJ read the exact same state the same way.
 const STATUS_COPY: Record<DJStatus, { label: string; dot: string }> = {
-  open: { label: "🔛", dot: "bg-go" },
-  closed: { label: "Not taking requests", dot: "bg-drop" },
+  open: { label: "🙂", dot: "bg-go" },
+  closed: { label: "🙁", dot: "bg-drop" },
 };
 
 interface Tile {
@@ -100,7 +104,17 @@ export default function GenreGrid({
                 <span className="absolute -inset-1 rounded-full bg-go/40 animate-pulse-ring" />
               )}
             </span>
-            <span className="truncate">{status ? status.label : eventLine}</span>
+            {status ? (
+              <span
+                role="img"
+                aria-label={djStatus === "open" ? "Taking requests" : "Not taking requests"}
+                className="text-[22px] leading-none"
+              >
+                {status.label}
+              </span>
+            ) : (
+              <span className="truncate">{eventLine}</span>
+            )}
           </span>
           {onPulseChange && (
             <PulseToggle
