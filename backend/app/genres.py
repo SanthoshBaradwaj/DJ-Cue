@@ -22,6 +22,8 @@ GENRES = [
     Genre(key="tamil", label="Tamil", region="south"),
     Genre(key="haryanvi", label="Haryanvi", region="north"),
     Genre(key="telugu", label="Telugu", region="south"),
+    Genre(key="kannada", label="Kannada", region="south"),
+    Genre(key="malayalam", label="Malayalam", region="south"),
     Genre(key="marathi", label="Marathi", region="other"),
     Genre(key="bollywood", label="Bollywood", region="north"),
     Genre(key="english", label="English", region="other"),
@@ -29,7 +31,7 @@ GENRES = [
     # Catch-all so a guest whose song doesn't fit any bucket above can still
     # request it, rather than forcing a mistagged pick. Last on purpose --
     # it's the fallback, not a fifth option worth equal billing.
-    Genre(key="other", label="Other genre", region="other"),
+    Genre(key="other", label="More", region="other"),
 ]
 
 _BY_KEY = {g.key: g.label for g in GENRES}
