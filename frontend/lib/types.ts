@@ -106,6 +106,17 @@ export interface SongRequest {
   updated_at: number;
 }
 
+/** Confirms a flush actually deleted something, and how much -- the
+ * operator's toast, so a flush against an already-empty event reads
+ * differently from one that genuinely cleared a live queue. */
+export interface FlushAck {
+  event_id: string;
+  requests_removed: number;
+  taps_removed: number;
+  pulse_votes_removed: number;
+  first_time_answers_removed: number;
+}
+
 export interface RequestAck {
   request_id: string | null;
   song_title: string;

@@ -19,6 +19,7 @@ from ..contracts import (
     Event,
     EventSettings,
     FirstTimeAnswerAck,
+    FlushAck,
     GenreBucketView,
     PulseAck,
     RequestAck,
@@ -116,6 +117,20 @@ class CueService:
         if event is None:
             event = self.store.create_event("DJPrashant-PDX")
         return event.id
+
+    # A fixed slug (not a name lookup) so this is find-or-create rather than
+    # create-on-every-call -- create_event() de-dupes slugs by appending
+    # -2, -3, so calling it with the same name repeatedly would otherwise
+    # spawn a fresh "dev" event on every request. One permanent event to
+    # test against, safe to flush as often as needed, never the real one.
+    DEV_EVENT_SLUG = "dj-cue-dev-test"
+    DEV_EVENT_NAME = "DJ-Cue Dev/Test"
+
+    def get_or_create_dev_event(self) -> Event:
+        event = self.store.get_event_by_slug(self.DEV_EVENT_SLUG)
+        if event is not None:
+            return event
+        return self.store.create_event(self.DEV_EVENT_NAME)
 
     # -- catalog ----------------------------------------------------------
 
@@ -322,6 +337,17 @@ class CueService:
         if updated is not None:
             self.broadcast_state(event_id)
         return updated
+
+    def flush_event(self, event_id: str) -> FlushAck:
+        """Hard-deletes every queued/played/dismissed request, session tap,
+        pulse vote, and first-time-answer for one event -- a true "start
+        from zero" for a single gig, not the soft dismiss the rest of this
+        app uses (that stays reachable for post-event analysis; this is the
+        one path that doesn't). The event row itself and its settings are
+        untouched, so nobody has to rescan a QR code after this runs."""
+        ack = self.store.flush_event_data(event_id)
+        self.broadcast_state(event_id)
+        return ack
 
     def set_request_status(
         self, event_id: str, request_id: str, status: str

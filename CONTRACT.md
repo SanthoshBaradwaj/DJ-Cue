@@ -24,13 +24,49 @@ Use `frontend/lib/api.ts` — never hand-roll a fetch.
 | GET | `/api/genres` | — | `{genres: Genre[]}` |
 | GET | `/api/events` | — | `{events: Event[]}` |
 | POST | `/api/events` | `{name}` | `Event` |
-| POST | `/api/events/{id}/status` | `{status}` | `Event` |
+| GET | `/api/events/dev` | — | `Event` |
+| POST | `/api/auth/verify-pin` | `{pin}` | `{ok: true}` (401 if wrong) |
+| POST | `/api/events/{id}/status` 🔒 | `{status}` | `Event` |
 | POST | `/api/events/{id}/pulse` | `{session_id, status}` | `PulseAck` |
+| POST | `/api/events/{id}/flush` 🔒 | — | `FlushAck` |
 | GET | `/api/catalog/search?q=&genre=&limit=` | — | `{songs: Song[]}` |
 | POST | `/api/requests` | `{event_id, session_id, genre, song_title, song_artist?, song_id?, artwork_url?}` | `RequestAck` |
 | GET | `/api/dashboard?event_id=` | — | `DashboardState` |
-| POST | `/api/requests/{id}/status?event_id=` | `{status}` | `SongRequest` |
-| POST | `/api/requests/{id}/refresh?event_id=` | — | `SongRequest` |
+| POST | `/api/requests/{id}/status?event_id=` 🔒 | `{status}` | `SongRequest` |
+| POST | `/api/requests/{id}/refresh?event_id=` 🔒 | — | `SongRequest` |
+
+🔒 = requires the `X-Operator-Pin` header (see below). `frontend/lib/api.ts`
+attaches it automatically once `setOperatorPin` has been called — every
+other call site is a plain `api.*` call, no special handling needed.
+
+## Operator PIN
+
+`/dj` and `/present` are both reachable by anyone with the URL, and
+`/present`'s reset button is a hard delete of live event data — so every
+DJ-only *write* also requires one shared operator PIN, checked server-side
+(`require_operator_pin` in `main.py`) against `CUE_OPERATOR_PIN` (default
+`"3006"`, an explicit placeholder — override before a real event), not just
+hidden behind a client-side gate. Guest-facing routes (search, submit,
+pulse, first-time-answer, config) never require it — gating those would
+break the core product. `frontend/app/components/shared/PinGate.tsx` wraps
+both pages: it verifies a `sessionStorage`-cached PIN via `/api/auth/verify-pin`
+on load, or prompts for one, then every subsequent `api.*` call attaches it
+automatically via the `X-Operator-Pin` header.
+
+`/api/events/dev` is find-or-create (slug `dj-cue-dev-test`) and not
+PIN-gated — reading or lazily creating one inert test event isn't itself
+damaging, and `/present`'s own PIN gate already keeps its dev/prod toggle
+out of reach. `/present` uses it to point its own view (QR, stats, and the
+reset button) at a permanent throwaway event instead of the real one, via a
+`sessionStorage`-only toggle local to that page — `/dj`'s own event
+selection is unaffected.
+
+`/flush` hard-deletes every `requests` / `request_taps` / `pulse_votes` /
+`first_time_answers` row for one event — a true reset, unlike `/status`'s
+soft delete. The event row and its settings are untouched, so nobody needs
+to rescan a QR code afterward. Returns `FlushAck` with per-table counts
+removed, so the operator's confirmation toast can say what actually
+happened rather than just "done."
 
 `status` (on requests) is one of `"queued" \| "played" \| "dismissed"`.
 Setting `played` or `dismissed` is a **soft delete** — the row leaves the

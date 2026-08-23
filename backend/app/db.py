@@ -28,6 +28,7 @@ from .contracts import (
     Event,
     EventStats,
     FirstTimeAnswerAck,
+    FlushAck,
     PulseAck,
     RequestAck,
     SongRequest,
@@ -148,6 +149,13 @@ class Store:
     def get_event(self, event_id: str) -> Optional[Event]:
         res = _exec(
             lambda: self.client.table("events").select("*").eq("id", event_id).limit(1)
+        )
+        rows = res.data or []
+        return _row_to_event(rows[0]) if rows else None
+
+    def get_event_by_slug(self, slug: str) -> Optional[Event]:
+        res = _exec(
+            lambda: self.client.table("events").select("*").eq("slug", slug).limit(1)
         )
         rows = res.data or []
         return _row_to_event(rows[0]) if rows else None
@@ -345,6 +353,25 @@ class Store:
         if not rows or rows[0] is None or rows[0].get("id") is None:
             return None
         return _row_to_request(rows[0])
+
+    def flush_event_data(self, event_id: str) -> FlushAck:
+        # RLS grants no direct DELETE on any of these tables -- same
+        # SECURITY DEFINER pattern as every other mutation, and the one
+        # place in the app that does a hard delete rather than a soft
+        # status flip, since "clean slate" means the counts genuinely go
+        # back to zero, not just leave the queued view.
+        res = _exec(
+            lambda: self.client.rpc("flush_event_data", {"p_event_id": event_id})
+        )
+        rows = res.data or []
+        row = rows[0] if rows else {}
+        return FlushAck(
+            event_id=event_id,
+            requests_removed=row.get("requests_removed") or 0,
+            taps_removed=row.get("taps_removed") or 0,
+            pulse_votes_removed=row.get("pulse_votes_removed") or 0,
+            first_time_answers_removed=row.get("first_time_answers_removed") or 0,
+        )
 
     def health(self) -> DBHealth:
         """A real round trip to Postgres, not just process liveness -- and

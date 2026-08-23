@@ -3,8 +3,11 @@
     uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 CORS is fully permissive on purpose: guests hit this from arbitrary phones on
-a venue LAN, and there is nothing to protect -- no accounts, no personal
-data, just an anonymous session id and a song title.
+a venue LAN, and there is nothing to protect on the guest side -- no
+accounts, no personal data, just an anonymous session id and a song title.
+The DJ-only write endpoints are the exception: they sit behind one shared
+operator PIN (see require_operator_pin below), since a request-queue reset
+button is real damage a stranger with the URL shouldn't be able to trigger.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -28,6 +31,7 @@ from .contracts import (
     EventCreate,
     EventSettings,
     FirstTimeAnswerCreate,
+    PinVerify,
     PulseUpdate,
     RequestCreate,
     StatusUpdate,
@@ -35,6 +39,15 @@ from .contracts import (
 )
 from .events import bus
 from .genres import GENRES
+
+
+def require_operator_pin(x_operator_pin: Optional[str] = Header(default=None)) -> None:
+    """Gate for every DJ-only write. Checked server-side, not just hidden
+    behind a client-side page gate -- the PIN travels as a header the
+    frontend attaches automatically once entered, so finding the route in
+    devtools doesn't bypass it the way a UI-only gate would."""
+    if not x_operator_pin or x_operator_pin != settings.operator_pin:
+        raise HTTPException(status_code=401, detail="missing or incorrect operator PIN")
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
@@ -126,14 +139,39 @@ def create_event(payload: EventCreate):
     return event.model_dump(mode="json")
 
 
+@app.get("/api/events/dev")
+def dev_event():
+    """The one permanent test event /present's dev-mode toggle points at --
+    created on first call, reused forever after. Not PIN-gated: reading (or
+    lazily creating) an inert test event's id isn't itself damaging, and
+    /present's own PIN gate already keeps the toggle out of reach."""
+    event = get_service().get_or_create_dev_event()
+    return event.model_dump(mode="json")
+
+
+@app.post("/api/auth/verify-pin")
+def verify_pin(payload: PinVerify):
+    if payload.pin != settings.operator_pin:
+        return JSONResponse(status_code=401, content={"detail": "incorrect PIN"})
+    return {"ok": True}
+
+
 @app.post("/api/events/{event_id}/status")
-def update_dj_status(event_id: str, payload: DJStatusUpdate):
+def update_dj_status(
+    event_id: str, payload: DJStatusUpdate, _auth: None = Depends(require_operator_pin)
+):
     if payload.status not in ("open", "closed"):
         return JSONResponse(status_code=422, content={"detail": "unknown dj status"})
     updated = get_service().set_dj_status(event_id, payload.status)
     if updated is None:
         return JSONResponse(status_code=404, content={"detail": "event not found"})
     return updated.model_dump(mode="json")
+
+
+@app.post("/api/events/{event_id}/flush")
+def flush_event(event_id: str, _auth: None = Depends(require_operator_pin)):
+    ack = get_service().flush_event(event_id)
+    return ack.model_dump(mode="json")
 
 
 @app.post("/api/events/{event_id}/pulse")
@@ -219,7 +257,12 @@ def dashboard(event_id: Optional[str] = Query(default=None)):
 
 
 @app.post("/api/requests/{request_id}/status")
-def update_request_status(request_id: str, payload: StatusUpdate, event_id: str = Query(...)):
+def update_request_status(
+    request_id: str,
+    payload: StatusUpdate,
+    event_id: str = Query(...),
+    _auth: None = Depends(require_operator_pin),
+):
     if payload.status not in ("played", "dismissed", "queued"):
         return JSONResponse(status_code=422, content={"detail": "unknown status"})
     updated = get_service().set_request_status(event_id, request_id, payload.status)
@@ -229,7 +272,9 @@ def update_request_status(request_id: str, payload: StatusUpdate, event_id: str 
 
 
 @app.post("/api/requests/{request_id}/refresh")
-def refresh_request_metadata(request_id: str, event_id: str = Query(...)):
+def refresh_request_metadata(
+    request_id: str, event_id: str = Query(...), _auth: None = Depends(require_operator_pin)
+):
     updated = get_service().refresh_request_metadata(event_id, request_id)
     if updated is None:
         return JSONResponse(status_code=404, content={"detail": "request not found"})

@@ -234,6 +234,23 @@ class StatusUpdate(BaseModel):
     status: str  # "played" | "dismissed"
 
 
+class PinVerify(BaseModel):
+    pin: str
+
+
+class FlushAck(BaseModel):
+    """Confirms a `/flush` actually deleted something, and how much --
+    the operator sees this as the toast, so a flush that silently matched
+    zero rows (wrong event, already clean) reads differently from one that
+    genuinely cleared a live queue."""
+
+    event_id: str
+    requests_removed: int = 0
+    taps_removed: int = 0
+    pulse_votes_removed: int = 0
+    first_time_answers_removed: int = 0
+
+
 # ---------------------------------------------------------------------------
 # Health -- /api/health reports whether the database is actually reachable
 # and taking writes, not just whether the process is up.

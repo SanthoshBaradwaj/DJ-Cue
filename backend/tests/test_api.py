@@ -14,11 +14,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import main  # noqa: E402
+from app.config import settings as backend_settings  # noqa: E402
 from app.contracts import (  # noqa: E402
     DashboardState,
     Event,
     EventStats,
     FirstTimeAnswerAck,
+    FlushAck,
     PulseAck,
     RequestAck,
     Song,
@@ -26,6 +28,8 @@ from app.contracts import (  # noqa: E402
 )
 from app.db import slugify  # noqa: E402
 from app.genres import GENRES  # noqa: E402
+
+PIN_HEADERS = {"X-Operator-Pin": backend_settings.operator_pin}
 
 
 class FakeService:
@@ -181,6 +185,19 @@ class FakeService:
                 return r
         return None
 
+    def get_or_create_dev_event(self):
+        for e in self.events:
+            if e.slug == "dj-cue-dev-test":
+                return e
+        return self.create_event("DJ-Cue Dev/Test")
+
+    def flush_event(self, event_id):
+        removed = 0
+        for key in [k for k in self.requests if k[0] == event_id]:
+            del self.requests[key]
+            removed += 1
+        return FlushAck(event_id=event_id, requests_removed=removed)
+
     def refresh_request_metadata(self, event_id, request_id):
         for r in self.requests.values():
             if r.id == request_id and r.event_id == event_id:
@@ -284,6 +301,7 @@ def test_dismiss_is_a_soft_delete_not_a_row_removal(monkeypatch):
         "/api/requests/%s/status" % req["request_id"],
         params={"event_id": event["id"]},
         json={"status": "dismissed"},
+        headers=PIN_HEADERS,
     )
     assert res.status_code == 200
     assert res.json()["status"] == "dismissed"
@@ -309,7 +327,9 @@ def test_refresh_metadata_fills_gaps_without_clobbering_existing_fields(monkeypa
     req = client.post("/api/requests", json=body).json()
 
     res = client.post(
-        "/api/requests/%s/refresh" % req["request_id"], params={"event_id": event["id"]}
+        "/api/requests/%s/refresh" % req["request_id"],
+        params={"event_id": event["id"]},
+        headers=PIN_HEADERS,
     )
     assert res.status_code == 200
     updated = res.json()
@@ -323,7 +343,9 @@ def test_refresh_metadata_fills_gaps_without_clobbering_existing_fields(monkeypa
 def test_refresh_metadata_404s_for_unknown_request(monkeypatch):
     client, _fake = _client(monkeypatch)
     event = client.post("/api/events", json={"name": "Refresh 404"}).json()
-    res = client.post("/api/requests/nope/refresh", params={"event_id": event["id"]})
+    res = client.post(
+        "/api/requests/nope/refresh", params={"event_id": event["id"]}, headers=PIN_HEADERS
+    )
     assert res.status_code == 404
 
 
@@ -360,20 +382,24 @@ def test_dj_status_toggle(monkeypatch):
     event = client.post("/api/events", json={"name": "Status Test"}).json()
     assert event["dj_status"] == "open"
 
-    res = client.post(f"/api/events/{event['id']}/status", json={"status": "closed"})
+    res = client.post(
+        f"/api/events/{event['id']}/status", json={"status": "closed"}, headers=PIN_HEADERS
+    )
     assert res.status_code == 200
     assert res.json()["dj_status"] == "closed"
 
     # "busy" was a real status once -- removing it must actually reject it,
     # not silently accept it as a no-op.
-    bad = client.post(f"/api/events/{event['id']}/status", json={"status": "busy"})
+    bad = client.post(
+        f"/api/events/{event['id']}/status", json={"status": "busy"}, headers=PIN_HEADERS
+    )
     assert bad.status_code == 422
 
 
 def test_closed_dj_status_blocks_requests_with_a_polite_message(monkeypatch):
     client, _fake = _client(monkeypatch)
     event = client.post("/api/events", json={"name": "Closed Test"}).json()
-    client.post(f"/api/events/{event['id']}/status", json={"status": "closed"})
+    client.post(f"/api/events/{event['id']}/status", json={"status": "closed"}, headers=PIN_HEADERS)
 
     res = client.post(
         "/api/requests",
@@ -478,3 +504,94 @@ def test_first_time_answer_is_idempotent_per_session(monkeypatch):
     # overwrite the original answer, even with a different choice.
     second = client.post("/api/first-time-answer", json=dict(body, answer="no")).json()
     assert second == {"answer": "yes", "already_answered": True}
+
+
+def test_operator_pin_required_on_dj_only_writes(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "PIN Test"}).json()
+
+    # No header at all.
+    no_header = client.post(f"/api/events/{event['id']}/status", json={"status": "closed"})
+    assert no_header.status_code == 401
+
+    # Wrong PIN.
+    wrong = client.post(
+        f"/api/events/{event['id']}/status",
+        json={"status": "closed"},
+        headers={"X-Operator-Pin": "0000"},
+    )
+    assert wrong.status_code == 401
+
+    # Correct PIN.
+    right = client.post(
+        f"/api/events/{event['id']}/status", json={"status": "closed"}, headers=PIN_HEADERS
+    )
+    assert right.status_code == 200
+
+
+def test_operator_pin_not_required_on_guest_facing_routes(monkeypatch):
+    # Submitting a request, searching, and voting pulse must all keep working
+    # with zero headers -- gating these would break the actual product.
+    client, _fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Guest Open Test"}).json()
+
+    submit = client.post(
+        "/api/requests",
+        json={
+            "event_id": event["id"],
+            "session_id": "s1",
+            "genre": "punjabi",
+            "song_title": "Lover",
+        },
+    )
+    assert submit.status_code == 200
+
+    pulse = client.post(
+        f"/api/events/{event['id']}/pulse", json={"session_id": "s1", "status": "single"}
+    )
+    assert pulse.status_code == 200
+
+
+def test_verify_pin_endpoint(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    ok = client.post("/api/auth/verify-pin", json={"pin": backend_settings.operator_pin})
+    assert ok.status_code == 200
+    assert ok.json() == {"ok": True}
+
+    bad = client.post("/api/auth/verify-pin", json={"pin": "0000"})
+    assert bad.status_code == 401
+
+
+def test_dev_event_is_find_or_create_not_create_every_call(monkeypatch):
+    client, _fake = _client(monkeypatch)
+    first = client.get("/api/events/dev").json()
+    second = client.get("/api/events/dev").json()
+    assert first["id"] == second["id"]
+    assert first["slug"] == "dj-cue-dev-test"
+
+
+def test_flush_requires_pin_and_clears_the_event(monkeypatch):
+    client, fake = _client(monkeypatch)
+    event = client.post("/api/events", json={"name": "Flush Test"}).json()
+    client.post(
+        "/api/requests",
+        json={
+            "event_id": event["id"],
+            "session_id": "s1",
+            "genre": "punjabi",
+            "song_title": "Lover",
+        },
+    )
+
+    no_pin = client.post(f"/api/events/{event['id']}/flush")
+    assert no_pin.status_code == 401
+    # Nothing removed by the rejected attempt.
+    assert any(k[0] == event["id"] for k in fake.requests)
+
+    res = client.post(f"/api/events/{event['id']}/flush", headers=PIN_HEADERS)
+    assert res.status_code == 200
+    assert res.json()["requests_removed"] == 1
+    assert not any(k[0] == event["id"] for k in fake.requests)
+
+    dash = client.get("/api/dashboard", params={"event_id": event["id"]}).json()
+    assert dash["requests"] == []

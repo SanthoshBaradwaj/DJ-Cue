@@ -7,6 +7,7 @@ import type {
   EventRecord,
   EventSettings,
   FirstTimeAnswerAck,
+  FlushAck,
   HealthReport,
   PulseAck,
   PulseStatus,
@@ -61,14 +62,50 @@ export function sessionId(): string {
   return id;
 }
 
+const PIN_KEY = "cue_operator_pin";
+
+/** The one shared operator PIN, gating /dj and /present plus every DJ-only
+ * write server-side (see backend/app/main.py's require_operator_pin).
+ * sessionStorage, not localStorage -- a shared venue laptop or a TV browser
+ * left logged in shouldn't stay unlocked across a completely different day. */
+export function getOperatorPin(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(PIN_KEY);
+}
+
+export function setOperatorPin(pin: string): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(PIN_KEY, pin);
+}
+
+export function clearOperatorPin(): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(PIN_KEY);
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
+  const pin = getOperatorPin();
   const res = await fetch(`${apiBase()}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      // Harmless on every guest-facing route -- the backend only checks
+      // this header on the handful of DJ-only writes that declare it.
+      ...(pin ? { "X-Operator-Pin": pin } : {}),
+      ...(init?.headers || {}),
+    },
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText} ${detail}`.trim());
+    throw new ApiError(res.status, `${res.status} ${res.statusText} ${detail}`.trim());
   }
   return (await res.json()) as T;
 }
@@ -81,10 +118,21 @@ export const api = {
       `/api/config${eventId ? `?event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
 
+  auth: {
+    verifyPin: (pin: string) =>
+      json<{ ok: boolean }>("/api/auth/verify-pin", {
+        method: "POST",
+        body: JSON.stringify({ pin }),
+      }),
+  },
+
   events: {
     list: () => json<{ events: EventRecord[] }>("/api/events"),
     create: (name: string) =>
       json<EventRecord>("/api/events", { method: "POST", body: JSON.stringify({ name }) }),
+    // The one permanent "Dev/Test" event /present's dev-mode toggle points
+    // at -- find-or-create server-side, safe to call every time.
+    getDev: () => json<EventRecord>("/api/events/dev"),
     setDjStatus: (eventId: string, status: DJStatus) =>
       json<EventRecord>(`/api/events/${encodeURIComponent(eventId)}/status`, {
         method: "POST",
@@ -95,6 +143,10 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ session_id: sessionId(), status }),
       }),
+    // Hard-deletes every request/tap/pulse-vote/first-time-answer for one
+    // event -- a true reset, not the soft dismiss every other action uses.
+    flush: (eventId: string) =>
+      json<FlushAck>(`/api/events/${encodeURIComponent(eventId)}/flush`, { method: "POST" }),
   },
 
   searchSongs: (q: string, genre?: string, limit = 8) =>

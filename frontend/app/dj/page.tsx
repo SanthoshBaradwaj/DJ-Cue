@@ -16,10 +16,19 @@ import { RequestRow } from "../components/dj/RequestRow";
 import { TopBar } from "../components/dj/TopBar";
 import { useDashboardFeed } from "../components/dj/useDashboardFeed";
 import { useFlipReorder } from "../components/dj/useFlipReorder";
+import { PinGate } from "../components/shared/PinGate";
 
 const ACTIVE_EVENT_KEY = "cue_dj_active_event";
 
 export default function DJDashboardPage() {
+  return (
+    <PinGate>
+      <DJDashboard />
+    </PinGate>
+  );
+}
+
+function DJDashboard() {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(true);
