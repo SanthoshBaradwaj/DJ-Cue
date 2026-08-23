@@ -47,6 +47,7 @@ function Ripple() {
 export default function Confirmation({
   ack,
   toastCopy,
+  instagramHandle,
   onRequestAnother,
   onChangeGenre,
 }: {
@@ -55,6 +56,12 @@ export default function Confirmation({
    * default per-submission message when set. Null for every event that
    * hasn't configured one -- unchanged behaviour. */
   toastCopy?: string | null;
+  /** Config-gated (settings.instagram_handle), same as GenreGrid's Follow
+   * button. When set, this screen's two actions become "DM Your DJ" (an
+   * IG link) and "Home" instead of "Request another song" / "Different
+   * genre" -- an event that hasn't configured a handle keeps today's
+   * behaviour unchanged rather than ever showing a dead link. */
+  instagramHandle?: string | null;
   onRequestAnother: () => void;
   onChangeGenre: () => void;
 }) {
@@ -116,21 +123,53 @@ export default function Confirmation({
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={onRequestAnother}
-        className="tap mt-9 flex h-14 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-cue-1 to-cue-2 text-[17px] font-semibold text-white shadow-[0_10px_40px_-12px_rgba(255,45,120,0.75)] transition-all duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chalk/80 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
-      >
-        Request another song
-      </button>
+      {instagramHandle ? (
+        <>
+          <a
+            href={`https://www.instagram.com/${instagramHandle}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tap mt-9 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cue-1 to-cue-2 text-[17px] font-semibold text-white shadow-[0_10px_40px_-12px_rgba(255,45,120,0.75)] transition-all duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chalk/80 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="5" />
+              <circle cx="12" cy="12" r="4" />
+              <circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none" />
+            </svg>
+            DM Your DJ
+          </a>
 
-      <button
-        type="button"
-        onClick={onChangeGenre}
-        className="tap mt-3 flex h-14 w-full items-center justify-center rounded-2xl border border-ink-line bg-ink-card/80 text-[16px] font-semibold text-chalk transition-colors duration-150 active:bg-ink-line/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
-      >
-        Different genre
-      </button>
+          <button
+            type="button"
+            onClick={onChangeGenre}
+            className="tap mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-ink-line bg-ink-card/80 text-[16px] font-semibold text-chalk transition-colors duration-150 active:bg-ink-line/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 11.5 12 4l8 7.5" />
+              <path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9" />
+            </svg>
+            Home
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onRequestAnother}
+            className="tap mt-9 flex h-14 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-cue-1 to-cue-2 text-[17px] font-semibold text-white shadow-[0_10px_40px_-12px_rgba(255,45,120,0.75)] transition-all duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-chalk/80 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
+          >
+            Request another song
+          </button>
+
+          <button
+            type="button"
+            onClick={onChangeGenre}
+            className="tap mt-3 flex h-14 w-full items-center justify-center rounded-2xl border border-ink-line bg-ink-card/80 text-[16px] font-semibold text-chalk transition-colors duration-150 active:bg-ink-line/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+          >
+            Different genre
+          </button>
+        </>
+      )}
     </div>
   );
 }

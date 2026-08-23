@@ -123,9 +123,18 @@ export default function GenreGrid({
           href={`https://www.instagram.com/${instagramHandle}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="tap mt-4 flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-ink-line bg-gradient-to-r from-[#f9ce34]/15 via-[#ee2a7b]/15 to-[#6228d7]/15 text-[14px] font-semibold text-chalk transition-colors duration-150 active:from-[#f9ce34]/25 active:via-[#ee2a7b]/25 active:to-[#6228d7]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
+          // A translucent Instagram-brand gradient at low opacity blended
+          // into the dark background instead of separating from it -- with
+          // nothing here reading as a clear, distinct block, the pulse
+          // buttons above and "Request your favourites" below lost their
+          // own visual weight too, since everything read as one undifferentiated
+          // stack of similar-contrast cards. Solid cue-1-on-ink (this app's
+          // own accent, not Instagram's) gives this its own clear identity,
+          // which is what actually restores separation to the sections
+          // around it.
+          className="tap mt-4 flex h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-cue-1 text-[14px] font-bold text-ink transition-all duration-150 active:scale-[0.985] active:brightness-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cue-1/70"
         >
-          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="3" y="3" width="18" height="18" rx="5" />
             <circle cx="12" cy="12" r="4" />
             <circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none" />

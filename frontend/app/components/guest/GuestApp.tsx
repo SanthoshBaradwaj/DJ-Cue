@@ -267,6 +267,7 @@ export default function GuestApp() {
           <Confirmation
             ack={ack}
             toastCopy={settings?.confirmation_toast_copy ?? null}
+            instagramHandle={settings?.instagram_handle ?? null}
             onRequestAnother={requestAnother}
             onChangeGenre={changeGenre}
           />
